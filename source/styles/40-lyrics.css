@@ -1,0 +1,186 @@
+/* Lyrics layer inside the expanded current-track card (SPEC §9). Mounted in `.poster__lyrics`
+   (`container-type: inline-size`), so cqw scales with the card width. Light text on the dark shade. */
+
+.lyrics {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: clamp(10px, 1.8cqw, 20px);
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: var(--host-text, #fff);
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  text-align: left;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 55%);
+  pointer-events: none;
+}
+
+/* Author `display: flex` would otherwise win over the UA `[hidden]` rule. */
+.lyrics[hidden] {
+  display: none;
+}
+
+.lyrics .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lyrics__line {
+  flex: 0 0 auto;
+  min-width: 0;
+  transform-origin: left center;
+  transition: transform .32s ease, opacity .32s ease, filter .32s ease;
+}
+
+.lyrics__line--current {
+  font-size: clamp(32px, 6.4cqw, 58px);
+  font-weight: 700;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.lyrics__line--next {
+  font-size: clamp(22px, 4.4cqw, 40px);
+  font-weight: 600;
+  opacity: .5;
+  transform: scale(.8);
+  filter: blur(.6px);
+}
+
+.lyrics__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.lyrics__line--next[hidden] {
+  display: none;
+}
+
+.lyrics__line--current .lyrics__text {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  text-shadow: none;
+}
+
+.lyrics__translation {
+  display: none;
+  margin-top: .25em;
+  font-size: .62em;
+  font-weight: 500;
+  line-height: 1.3;
+  opacity: .68;
+}
+
+.lyrics[data-translation="true"] .lyrics__translation:not(:empty) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Glow follows glyphs only: no filter / overflow clip, or the bloom becomes a rectangle. */
+.lyrics__word {
+  display: inline;
+  color: rgb(255 255 255 / 38%);
+  text-shadow: none;
+}
+
+.lyrics__word--sung {
+  color: rgb(255 255 255 / 94%);
+}
+
+.lyrics__word--active {
+  color: #fff;
+  text-shadow:
+    0 0 .04em rgb(255 255 255 / 70%),
+    0 0 .14em rgb(255 255 255 / 36%);
+}
+
+.lyrics__plain {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: clamp(22px, 3.6cqw, 32px);
+  line-height: 1.6;
+}
+
+.lyrics__plain::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lyrics__plain::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 30%);
+  border-radius: 3px;
+}
+
+.lyrics__instrumental {
+  text-align: center;
+  font-size: clamp(28px, 5cqw, 46px);
+  font-weight: 600;
+  letter-spacing: .08em;
+  opacity: .85;
+}
+
+/* Light scheme: the layer still sits on the dark shade, so text stays light with a softer shadow. */
+html[data-color-scheme="light"] .lyrics,
+body[data-color-scheme="light"] .lyrics {
+  color: rgb(255 255 255 / 96%);
+  text-shadow: 0 1px 10px rgb(0 0 0 / 40%);
+}
+
+html[data-color-scheme="light"] .lyrics__line--current .lyrics__text,
+body[data-color-scheme="light"] .lyrics__line--current .lyrics__text {
+  text-shadow: none;
+}
+
+/* Reduced motion: no scale, blur or transitions; the whole current line stays highlighted. */
+.lyrics[data-reduced-motion="true"] .lyrics__line,
+body[data-reduced-motion="true"] .lyrics .lyrics__line {
+  transform: none;
+  filter: none;
+  transition: none;
+}
+
+.lyrics[data-reduced-motion="true"] .lyrics__line--next,
+body[data-reduced-motion="true"] .lyrics .lyrics__line--next {
+  opacity: .55;
+}
+
+.lyrics[data-reduced-motion="true"] .lyrics__line--current .lyrics__text,
+body[data-reduced-motion="true"] .lyrics .lyrics__line--current .lyrics__text {
+  filter: none;
+}
+
+.lyrics[data-reduced-motion="true"] .lyrics__word,
+body[data-reduced-motion="true"] .lyrics .lyrics__word {
+  color: rgb(255 255 255 / 88%);
+  text-shadow: none;
+}
+
+.lyrics[data-reduced-motion="true"] .lyrics__word--active,
+.lyrics[data-reduced-motion="true"] .lyrics__word--sung,
+body[data-reduced-motion="true"] .lyrics .lyrics__word--active,
+body[data-reduced-motion="true"] .lyrics .lyrics__word--sung {
+  color: #fff;
+}

@@ -1,0 +1,22 @@
+{
+  "contractVersion": 1,
+  "maximumPackageBytes": 2097152,
+  "maximumFiles": 32,
+  "maximumFileBytes": 524288,
+  "externalAssetPrefix": "assets/",
+  "maximumExternalAssetFileBytes": 134217728,
+  "maximumExternalAssetBytes": 268435456,
+  "supportedAssetExtensions": [
+    ".css",
+    ".html",
+    ".js",
+    ".json",
+    ".mjs"
+  ],
+  "supportedExternalAssetExtensions": [
+    ".wasm",
+    ".onnx",
+    ".bin",
+    ".data"
+  ]
+}

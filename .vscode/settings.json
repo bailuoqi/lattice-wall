@@ -1,0 +1,70 @@
+{
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "/echo.workshop.project.json"
+      ],
+      "url": "./.echo-sdk/schemas/project.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/echo.workshop.json"
+      ],
+      "url": "./.echo-sdk/schemas/echo.workshop.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/theme.json"
+      ],
+      "url": "./.echo-sdk/schemas/theme.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/community.echo"
+      ],
+      "url": "./.echo-sdk/schemas/plugin-package.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/lyrics-scene.json"
+      ],
+      "url": "./.echo-sdk/schemas/lyrics-style.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/animation-library.json"
+      ],
+      "url": "./.echo-sdk/schemas/animation-library.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/visualizer.json"
+      ],
+      "url": "./.echo-sdk/schemas/visualizer.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/dsp-preset.json"
+      ],
+      "url": "./.echo-sdk/schemas/dsp.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/audio-plugin-profile.json"
+      ],
+      "url": "./.echo-sdk/schemas/audio-plugin-profile.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/locale.json"
+      ],
+      "url": "./.echo-sdk/schemas/locale-pack.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/content/native-shell.json"
+      ],
+      "url": "./.echo-sdk/schemas/native-shell.schema.json"
+    }
+  ]
+}

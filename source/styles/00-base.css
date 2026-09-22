@@ -1,0 +1,66 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Fallbacks only: main.ts writes the live host appearance tokens inline on <html>. */
+:root {
+  color-scheme: dark;
+  --host-accent: #6678ff;
+  --host-accent-text: #ffffff;
+  --host-app-bg: #0f1116;
+  --host-text: #f2f4f8;
+  --host-muted: #9aa3b5;
+  --host-panel: #171a22;
+  --host-border: #2a2f3b;
+  --host-player: #171a22;
+  --host-accent-2: color-mix(in srgb, var(--host-accent) 45%, var(--host-text));
+  --shade-color: #000000;
+}
+
+html[data-color-scheme="light"] {
+  color-scheme: light;
+  --host-app-bg: #f3f4f8;
+  --host-text: #15181f;
+  --host-muted: #5f6777;
+  --host-panel: #ffffff;
+  --host-border: #d7dbe4;
+  --host-player: #ffffff;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--ui-font, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif);
+  color: var(--host-text);
+  background: var(--host-app-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--host-accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+body[data-reduced-motion="true"] .field__vignette,
+body[data-reduced-motion="true"] .world {
+  transition: none;
+}

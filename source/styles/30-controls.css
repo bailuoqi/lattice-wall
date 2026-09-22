@@ -1,0 +1,244 @@
+/* Playback controls: the cluster inside the expanded card, plus the corner locate button. */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  transition: opacity .25s ease;
+}
+
+.controls[data-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controls__row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.controls__button--skip,
+.controls__button--shuffle,
+.controls__button--repeat,
+.controls__button--lyrics,
+.controls__button--album {
+  overflow: hidden;
+  transition: width .32s cubic-bezier(.2, .8, .2, 1), opacity .28s ease;
+}
+
+.controls[data-mode="other"] .controls__button--skip,
+.controls[data-mode="other"] .controls__button--shuffle,
+.controls[data-mode="other"] .controls__button--repeat,
+.controls[data-mode="other"] .controls__button--lyrics {
+  width: 0;
+  min-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controls__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  /* theme-color-allow: icons sit on the dark cover shade in both host themes. */
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity .15s ease, transform .15s ease;
+}
+
+.controls__button svg {
+  width: 26px;
+  height: 26px;
+}
+
+.controls__button:hover {
+  opacity: .72;
+}
+
+.controls__button:active {
+  transform: scale(.94);
+}
+
+.controls__button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.controls__button--primary {
+  width: 64px;
+  height: 64px;
+  background: transparent;
+  color: #fff;
+}
+
+.controls__button--primary svg {
+  width: 30px;
+  height: 30px;
+}
+
+.controls__button--primary:hover {
+  background: transparent;
+}
+
+.controls__button--lyrics[data-on="false"],
+.controls__button--shuffle[data-on="false"],
+.controls__button--repeat[data-on="false"] {
+  opacity: .4;
+}
+
+.controls__glyph {
+  display: inline-flex;
+  line-height: 0;
+}
+
+/* Play / pause glyph swap, driven by data-state on .controls. */
+.controls[data-state="playing"] [data-glyph="play"],
+.controls[data-state="paused"] [data-glyph="pause"] {
+  display: none;
+}
+
+.controls[data-mode="other"] .controls__button--primary [data-glyph="play"] {
+  display: inline-flex;
+}
+
+.controls[data-mode="other"] .controls__button--primary [data-glyph="pause"] {
+  display: none;
+}
+
+/* Seek ---------------------------------------------------------------------------------------- */
+
+.controls__seek {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 50%;
+  min-width: 0;
+}
+
+/* The clock belongs to the playing track; a card for another track has nothing to seek. */
+.controls[data-mode="other"] .controls__seek {
+  display: none;
+}
+
+.controls__slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  /* theme-color-allow: a thin white fill on the dark cover shade; the thumb is invisible. */
+  background: linear-gradient(90deg, #fff calc(var(--progress, 0) * 100%), rgb(255 255 255 / 28%) 0);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: 0 50%;
+  outline: none;
+  cursor: pointer;
+}
+
+.controls__slider:focus-visible {
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 35%);
+}
+
+.controls__slider::-webkit-slider-runnable-track {
+  height: 16px;
+  background: transparent;
+}
+
+.controls__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 16px;
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.controls__time {
+  flex: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: rgb(255 255 255 / 85%);
+  white-space: nowrap;
+}
+
+/* Locate button (SPEC §2.5) ------------------------------------------------------------------- */
+
+/* Bottom-right corner; shown only while the playing track's expanded card is off screen. */
+.locate {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--host-border) 60%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--host-panel) 80%, transparent);
+  color: var(--host-text);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity .25s ease, transform .25s ease, background .15s ease, color .15s ease, visibility 0s linear 0s;
+}
+
+.locate svg {
+  width: 20px;
+  height: 20px;
+}
+
+.locate:hover {
+  background: color-mix(in srgb, var(--host-panel) 92%, var(--host-text));
+  color: var(--host-accent);
+}
+
+.locate:active {
+  transform: scale(.94);
+}
+
+.locate:focus-visible {
+  outline: 2px solid var(--host-accent);
+  outline-offset: 2px;
+}
+
+.locate[data-visible="false"] {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease, visibility 0s linear .25s;
+}
+
+body[data-reduced-motion="true"] .controls,
+body[data-reduced-motion="true"] .controls__button,
+body[data-reduced-motion="true"] .controls__button--skip,
+body[data-reduced-motion="true"] .controls__button--shuffle,
+body[data-reduced-motion="true"] .controls__button--repeat,
+body[data-reduced-motion="true"] .controls__button--lyrics,
+body[data-reduced-motion="true"] .controls__button--album,
+body[data-reduced-motion="true"] .controls__slider,
+body[data-reduced-motion="true"] .controls__slider::-webkit-slider-thumb,
+body[data-reduced-motion="true"] .locate {
+  transition: none;
+}

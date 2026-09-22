@@ -1,0 +1,58 @@
+{
+  "contractVersion": 1,
+  "type": "echo-workshop-native-shell",
+  "protocolVersions": [1],
+  "currentProtocolVersion": 1,
+  "description": "Official native-shell protocol v1. The host spawns a packaged Windows executable, speaks JSON Lines over a named pipe, and feeds playback / lyrics / cover / window focus. This is a system-shell channel, not the sandboxed plug-in VM. AudioBand is the reference implementation.",
+  "spawn": {
+    "argument": "--pipe",
+    "stdio": "ignore",
+    "windowsHide": false
+  },
+  "hostToProcess": ["config", "status", "quit"],
+  "processToHost": ["ready", "log", "command"],
+  "commands": [
+    "focusEcho",
+    "toggle",
+    "play",
+    "pause",
+    "next",
+    "previous",
+    "seekRatio",
+    "openLyrics",
+    "setOffset"
+  ],
+  "statusFields": [
+    "state",
+    "playing",
+    "title",
+    "artist",
+    "album",
+    "coverUrl",
+    "positionSeconds",
+    "durationSeconds",
+    "trackKey",
+    "officialEnabled",
+    "suppressed",
+    "lyricsCurrent",
+    "lyricsNext",
+    "lyricsHas",
+    "lyricsInstrumental"
+  ],
+  "permissions": [
+    "process:spawn",
+    "ipc:named-pipe",
+    "shell:taskbar",
+    "cover:original",
+    "window:focus",
+    "playback:read",
+    "playback:control",
+    "lyrics:read"
+  ],
+  "capabilities": [
+    "taskbar-hwnd",
+    "named-pipe",
+    "cover-original",
+    "window-focus"
+  ]
+}

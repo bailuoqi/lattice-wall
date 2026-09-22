@@ -1,0 +1,201 @@
+{
+  "ECHO Workshop: plugin-command": {
+    "prefix": "echo-plugin-command",
+    "scope": "javascript",
+    "description": "Register a command that reads playback status and notifies. Requires: playback:read.",
+    "body": [
+      "echo.commands.register('my-command', { title: 'My command' }, async () => {",
+      "  const status = await echo.playback.getStatus();",
+      "  await echo.ui.notify(status.currentTrackId ? 'Something is playing.' : 'Nothing is playing.');",
+      "});"
+    ]
+  },
+  "ECHO Workshop: plugin-storage": {
+    "prefix": "echo-plugin-storage",
+    "scope": "javascript",
+    "description": "Persist a small JSON value in the plug-in sandbox store. Requires: fs:plugin.",
+    "body": [
+      "const preferences = (await echo.storage.get('preferences')) ?? { compact: false };",
+      "preferences.compact = !preferences.compact;",
+      "await echo.storage.set('preferences', preferences);"
+    ]
+  },
+  "ECHO Workshop: plugin-function": {
+    "prefix": "echo-plugin-function",
+    "scope": "javascript",
+    "description": "Handle a host-rendered parameter form and compose another local command. Requires: fs:plugin.",
+    "body": [
+      "echo.commands.register('save-note', { title: 'Save note' }, async (input = {}) => {",
+      "  const summary = await echo.commands.execute('library-summary');",
+      "  const name = String(input.name || 'library-note').slice(0, 80);",
+      "  const limit = Math.max(1, Math.min(100, Number(input.limit) || 20));",
+      "  await echo.storage.set('library-note', { name, limit, trackCount: summary.trackCount || 0 });",
+      "  await echo.ui.notify(`Saved \\${name}.`);",
+      "});"
+    ]
+  },
+  "ECHO Workshop: plugin-settings": {
+    "prefix": "echo-plugin-settings",
+    "scope": "javascript",
+    "description": "Read a setting declared under contributes.settings. Requires: fs:plugin.",
+    "body": [
+      "const compact = await echo.settings.get('compact-layout');",
+      "await echo.ui.notify(compact ? 'Compact layout is on.' : 'Compact layout is off.');"
+    ]
+  },
+  "ECHO Workshop: lyrics-provider": {
+    "prefix": "echo-lyrics-provider",
+    "scope": "javascript",
+    "description": "Offer lyrics candidates the user can pick in the host selector. Requires: lyrics:provide.",
+    "body": [
+      "echo.lyrics.registerProvider('my-lyrics', { title: 'My lyrics' }, async ({ track, query }) => ({",
+      "  candidates: [{",
+      "    title: track.title,",
+      "    source: 'My packaged catalog',",
+      "    language: 'und',",
+      "    confidence: 0.5,",
+      "    text: `[00:00.00]\\${query || track.title}`,",
+      "  }],",
+      "}));"
+    ]
+  },
+  "ECHO Workshop: source-provider": {
+    "prefix": "echo-source-provider",
+    "scope": "javascript",
+    "description": "Author-owned catalog: search rows plus a single direct-stream resolve. Requires: sources:provide, sources:direct, network:request.",
+    "body": [
+      "echo.sources.registerProvider('my-catalog', { title: 'My catalog' }, {",
+      "  search: async ({ query, page, pageSize }) => {",
+      "    const response = await echo.network.get(",
+      "      `https://catalog.example/tracks?q=\\${encodeURIComponent(query || '')}&page=\\${page}&pageSize=\\${pageSize}`,",
+      "    );",
+      "    const payload = JSON.parse(response.body);",
+      "    const tracks = Array.isArray(payload?.tracks) ? payload.tracks : [];",
+      "    return { tracks, total: payload?.total ?? tracks.length, hasMore: payload?.hasMore === true };",
+      "  },",
+      "  resolve: async ({ providerTrackId }) => {",
+      "    const response = await echo.network.get(`https://catalog.example/resolve/\\${encodeURIComponent(providerTrackId)}`);",
+      "    const payload = JSON.parse(response.body);",
+      "    return { url: payload.url, title: payload.title, artist: payload.artist };",
+      "  },",
+      "});"
+    ]
+  },
+  "ECHO Workshop: network-fetch": {
+    "prefix": "echo-network-fetch",
+    "scope": "javascript",
+    "description": "Fetch JSON from a declared networkHosts destination with correct error handling. Requires: network:request.",
+    "body": [
+      "const loadCatalogPage = async (page) => {",
+      "  try {",
+      "    const response = await echo.network.get(`https://catalog.example/tracks?page=\\${page}`);",
+      "    return JSON.parse(response.body);",
+      "  } catch (error) {",
+      "    // capability-denied / network-host-denied: fix the declaration, do not retry in a loop.",
+      "    await echo.ui.notify(`Catalog request failed: \\${error instanceof Error ? error.message : error}`);",
+      "    return null;",
+      "  }",
+      "};"
+    ]
+  },
+  "ECHO Workshop: plugin-agent": {
+    "prefix": "echo-plugin-agent",
+    "scope": "javascript",
+    "description": "Register a local Agent handler that answers from sanitized data. Requires: agent:runtime, library:read.",
+    "body": [
+      "echo.agents.register('my-helper', { title: 'My helper' }, async (input) => {",
+      "  const summary = await echo.library.getSummary();",
+      "  return { input: String(input || ''), answer: `Your local library contains \\${summary.trackCount || 0} track(s).` };",
+      "});"
+    ]
+  },
+  "ECHO Workshop: trusted-handler": {
+    "prefix": "echo-trusted-handler",
+    "scope": "javascript",
+    "description": "Handle one request in the subscriber-approved Node.js utility process. Requires: system:full.",
+    "body": [
+      "export async function handle({ method, input }, context) {",
+      "  if (method === 'runtime-info') {",
+      "    return {",
+      "      input,",
+      "      pluginId: context.pluginId,",
+      "      node: process.versions.node,",
+      "      platform: process.platform,",
+      "    };",
+      "  }",
+      "  throw new Error(`Unknown trusted method: \\${method}`);",
+      "}"
+    ]
+  },
+  "ECHO Workshop: ui-runtime-init": {
+    "prefix": "echo-ui-runtime-init",
+    "scope": "javascript",
+    "description": "Minimal UI runtime bridge: ready handshake, command helper, init/state/result handling. Requires: capability: declare each command group in runtime.capabilities.",
+    "body": [
+      "const pending = new Map();",
+      "let requestSeq = 0;",
+      "const command = (name, payload = {}) => new Promise((resolve, reject) => {",
+      "  const requestId = `ui-\\${++requestSeq}`;",
+      "  pending.set(requestId, { resolve, reject });",
+      "  parent.postMessage({ type: 'echo:workshop-ui:command', requestId, command: name, payload }, '*');",
+      "});",
+      "",
+      "window.addEventListener('message', (event) => {",
+      "  const data = event.data;",
+      "  if (!data || typeof data !== 'object') return;",
+      "  if (data.type === 'echo:workshop-ui:init') {",
+      "    // data.capabilities lists what the host granted; data.appearance carries sanitized host colors.",
+      "    return;",
+      "  }",
+      "  if (data.type === 'echo:workshop-ui:state') {",
+      "    // data.playback, data.currentTrack, data.queue, data.library.revision, data.lyrics (with lyrics:read).",
+      "    return;",
+      "  }",
+      "  if (data.type !== 'echo:workshop-ui:result') return;",
+      "  const waiter = pending.get(data.requestId);",
+      "  if (!waiter) return;",
+      "  pending.delete(data.requestId);",
+      "  if (data.ok) waiter.resolve(data.value);",
+      "  else waiter.reject(new Error(data.error || 'command-failed'));",
+      "});",
+      "",
+      "parent.postMessage({ type: 'echo:workshop-ui:ready' }, '*');"
+    ]
+  },
+  "ECHO Workshop: theme-colors": {
+    "prefix": "echo-theme-colors",
+    "scope": "json,jsonc",
+    "description": "Dark/light tone override block for a colors-layer theme. Requires: nothing extra.",
+    "body": [
+      "{",
+      "  \"basePreset\": \"classic\",",
+      "  \"dark\": {",
+      "    \"appBg\": \"#10131a\",",
+      "    \"panel\": \"#182231\",",
+      "    \"accent\": \"#66ccff\",",
+      "    \"heading\": \"#f5fbff\",",
+      "    \"text\": \"#d8e8f3\"",
+      "  },",
+      "  \"light\": {",
+      "    \"appBg\": \"#eef8fc\",",
+      "    \"panel\": \"#f8fdff\",",
+      "    \"accent\": \"#0b78d0\",",
+      "    \"text\": \"#254252\"",
+      "  },",
+      "  \"swatches\": [\"#10131a\", \"#66ccff\", \"#eef8fc\"]",
+      "}"
+    ]
+  },
+  "ECHO Workshop: lyrics-slot": {
+    "prefix": "echo-lyrics-slot",
+    "scope": "json,jsonc",
+    "description": "One host-owned slot node for a lyrics scene. Requires: nothing extra.",
+    "body": [
+      "{",
+      "  \"id\": \"spectrum\",",
+      "  \"type\": \"slot\",",
+      "  \"slot\": \"spectrum\"",
+      "}"
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lattice · 专辑拼贴墙</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body data-state="booting">
+  <main class="lattice" id="lattice">
+    <div class="field" id="field" tabindex="0" role="application" aria-label="专辑拼贴墙，Ctrl + Space 打开功能面板" aria-keyshortcuts="Control+Space">
+      <div class="world" id="world"></div>
+      <div class="field__vignette" aria-hidden="true"></div>
+    </div>
+    <button class="locate" id="locate" type="button" data-visible="false" aria-label="定位到正在播放的专辑（当前页）" title="定位到正在播放的专辑（当前页） (C)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="6.5"/>
+        <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+        <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>
+      </svg>
+    </button>
+    <section class="state" id="state" role="status" aria-live="polite" hidden></section>
+  </main>
+  <script src="__bridge__.js"></script>
+  <script src="albums.js"></script>
+</body>
+</html>

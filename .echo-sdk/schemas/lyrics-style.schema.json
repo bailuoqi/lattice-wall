@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echo.example/schemas/workshop/lyrics-style.schema.json",
+  "title": "ECHO Workshop lyrics style",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "schemaVersion", "id", "title"],
+  "properties": {
+    "type": { "const": "echo-workshop-lyrics-style" },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 3, "maxLength": 80 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string" },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lyricsPageStyle": {
+          "enum": ["default", "editorial", "folded", "roseVinyl", "cinemaStage", "kineticPoster", "coverStage", "cutBoard"]
+        },
+        "lyricsFontSizePx": { "type": "number", "minimum": 16, "maximum": 96 },
+        "lyricsSecondaryFontSizePx": { "type": "number", "minimum": 10, "maximum": 64 },
+        "lyricsLineSpacingPercent": { "type": "number", "minimum": 80, "maximum": 240 },
+        "lyricsContextOpacityPercent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "lyricsCoverOpacityPercent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "lyricsCoverBlurPx": { "type": "number", "minimum": 0, "maximum": 80 },
+        "lyricsCoverBrightnessPercent": { "type": "number", "minimum": 20, "maximum": 150 },
+        "lyricsBackgroundScalePercent": { "type": "number", "minimum": 100, "maximum": 160 },
+        "lyricsSmartReadableColorsEnabled": { "type": "boolean" },
+        "lyricsWordHighlightEnabled": { "type": "boolean" },
+        "lyricsImmersiveCoverStyleEnabled": { "type": "boolean" },
+        "lyricsImmersiveCoverGlassEnabled": { "type": "boolean" },
+        "lyricsMusicReactiveVisualsEnabled": { "type": "boolean" },
+        "lyricsColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "lyricsBackgroundMode": { "enum": ["theme", "cover", "coverColor"] }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "root"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "background": { "enum": ["theme", "cover", "cover-blur", "cover-color", "transparent", "asset"] },
+        "backgroundAsset": { "type": "string" },
+        "hostChrome": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "miniPlayer": { "enum": ["visible", "hidden"] }
+          }
+        },
+        "root": { "type": "object" }
+      }
+    }
+  }
+}

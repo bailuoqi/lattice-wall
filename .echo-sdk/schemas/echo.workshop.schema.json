@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echo.example/schemas/workshop/echo.workshop.schema.json",
+  "title": "ECHO Workshop item manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "schemaVersion", "id", "title", "version", "content", "compatibility", "files", "license"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "type": { "const": "echo-workshop-item" },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 3, "maxLength": 80, "pattern": "^[a-z0-9](?:[a-z0-9._-]{1,78}[a-z0-9])?$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "version": { "$ref": "#/$defs/version" },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "entry"],
+      "properties": {
+        "kind": { "enum": ["theme", "lyrics-style", "animation-library", "visualizer-preset", "dsp-preset", "audio-plugin-profile", "locale-pack", "plugin-package", "native-shell"] },
+        "entry": { "$ref": "#/$defs/path" }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minEchoVersion"],
+      "properties": {
+        "minEchoVersion": { "$ref": "#/$defs/version" },
+        "maxEchoVersion": { "$ref": "#/$defs/version" },
+        "pluginApiVersion": { "type": "integer", "minimum": 1, "maximum": 9999 }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": { "$ref": "#/$defs/path" },
+          "size": { "type": "integer", "minimum": 0, "maximum": 134217728 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "holder"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "holder": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "sourceUrl": { "type": "string", "maxLength": 500, "pattern": "^https?://" }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/itemId" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["itemId"],
+            "properties": {
+              "itemId": { "$ref": "#/$defs/itemId" },
+              "versionRange": { "type": "string", "maxLength": 48, "pattern": "^(?:\\*|(?:\\^|~|>=|<=|>|<)?\\d+\\.\\d+\\.\\d+(?:-[0-9a-z]+(?:[.-][0-9a-z]+)*)?)$" },
+              "optional": { "type": "boolean" }
+            }
+          }
+        ]
+      }
+    },
+    "conflicts": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/itemId" } },
+    "networkHosts": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 253, "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "content": { "properties": { "kind": { "const": "plugin-package" } } } } },
+      "then": { "properties": { "compatibility": { "required": ["minEchoVersion", "pluginApiVersion"] } } },
+      "else": {
+        "properties": {
+          "compatibility": { "not": { "required": ["pluginApiVersion"] } },
+          "networkHosts": { "maxItems": 0 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "version": { "type": "string", "maxLength": 48, "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9a-z]+(?:[.-][0-9a-z]+)*)?$" },
+    "itemId": { "type": "string", "pattern": "^[1-9]\\d{0,19}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^<>:\"|?*]+$" }
+  }
+}

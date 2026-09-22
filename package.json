@@ -1,0 +1,21 @@
+{
+  "name": "echo.lattice-wall",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "reflows": "node scripts/generate-reflows.mjs",
+    "sync": "npm run build && node ./.echo-sdk/bin/echo-workshop-sdk.mjs sync .",
+    "check": "npm run sync && node ./.echo-sdk/bin/echo-workshop-sdk.mjs check .",
+    "test": "npm run typecheck && node --test scripts/test-*.mjs && npm run build && node scripts/verify-purity.mjs && node ./.echo-sdk/bin/echo-workshop-sdk.mjs test .",
+    "inspect": "node ./.echo-sdk/bin/echo-workshop-sdk.mjs inspect .",
+    "dev": "npm run build && node scripts/dev-harness.mjs",
+    "sdk:dev": "npm run sync && node ./.echo-sdk/bin/echo-workshop-sdk.mjs dev ."
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  }
+}

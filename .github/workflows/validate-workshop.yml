@@ -1,0 +1,52 @@
+# Validates this Workshop project on every push and pull request with the same
+# fail-closed gate you run locally: build + sync + manifest/hash validation +
+# quality report + deterministic mock fixtures. Nothing here uploads to Steam;
+# publication stays a manual step in ECHO's Authoring Studio.
+name: Validate ECHO Workshop project
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workshop-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      # content/community.echo packs everything under src/, and src/panel.js,
+      # src/panel.css and src/albums.js are produced by build.mjs. The runner
+      # therefore needs the dev dependencies before the gate can rebuild them.
+      - name: Install build dependencies
+        run: npm ci
+      - name: Build sandbox files
+        run: npm run build
+      # Runs the complete local gate and mirrors its report into the job
+      # summary, so pull requests show the quality/fixture verdict without
+      # opening the log. A blocker or failing fixture fails the job.
+      - name: Workshop gate (check)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node ./.echo-sdk/bin/echo-workshop-sdk.mjs check . | tee "$RUNNER_TEMP/gate-report.txt"
+          {
+            echo '## ECHO Workshop gate'
+            echo '```text'
+            cat "$RUNNER_TEMP/gate-report.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # check reruns sync, so a dirty tree here means generated files
+      # (the packaged plug-in or the manifest hashes) were not committed.
+      # Fix locally with: npm run check && git add -A
+      - name: Generated files are committed
+        run: git diff --exit-code

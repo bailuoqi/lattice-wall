@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "description": "Shared Workshop content-kind contract. The portable SDK and the in-app authoring service both consume this file, so default entry file names and Steam Workshop tags cannot drift between the two toolchains.",
+  "steamworksTags": [
+    "Theme",
+    "Lyrics Scene",
+    "Visualizer Preset",
+    "DSP / EQ Preset",
+    "Language Pack",
+    "Sandboxed Plugin",
+    "Native Shell"
+  ],
+  "kinds": {
+    "theme": { "entry": "theme.json", "tag": "Theme" },
+    "lyrics-style": { "entry": "lyrics-scene.json", "tag": "Lyrics Scene" },
+    "animation-library": { "entry": "animation-library.json", "tag": "Lyrics Scene" },
+    "visualizer-preset": { "entry": "visualizer.json", "tag": "Visualizer Preset" },
+    "dsp-preset": { "entry": "dsp-preset.json", "tag": "DSP / EQ Preset" },
+    "audio-plugin-profile": { "entry": "audio-plugin-profile.json", "tag": "DSP / EQ Preset" },
+    "locale-pack": { "entry": "locale.json", "tag": "Language Pack" },
+    "plugin-package": { "entry": "community.echo", "tag": "Sandboxed Plugin" },
+    "native-shell": { "entry": "native-shell.json", "tag": "Native Shell" }
+  }
+}

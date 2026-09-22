@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echo.example/schemas/workshop/dsp.schema.json",
+  "title": "ECHO Workshop DSP preset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "schemaVersion", "id", "title", "preampDb", "bands"],
+  "properties": {
+    "type": { "const": "echo-workshop-dsp-preset" },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 3, "maxLength": 80 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string" },
+    "preampDb": { "type": "number", "minimum": -12, "maximum": 6 },
+    "bands": {
+      "type": "array",
+      "minItems": 31,
+      "maxItems": 31,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["frequencyHz", "gainDb", "q"],
+        "properties": {
+          "frequencyHz": { "type": "number", "minimum": 20, "maximum": 20000 },
+          "gainDb": { "type": "number", "minimum": -12, "maximum": 12 },
+          "q": { "type": "number", "minimum": 0.1, "maximum": 12 },
+          "filterType": { "enum": ["peaking", "lowShelf", "highShelf", "lowPass", "highPass", "notch"] },
+          "enabled": { "type": "boolean" }
+        }
+      }
+    },
+    "audioEffect": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "bitDepth", "sampleRateHz", "mix"],
+          "properties": {
+            "type": { "const": "bitcrusher" },
+            "bitDepth": { "type": "integer", "minimum": 4, "maximum": 16 },
+            "sampleRateHz": { "type": "integer", "minimum": 1000, "maximum": 192000 },
+            "mix": { "type": "number", "minimum": 0, "maximum": 1 },
+            "outputGainDb": { "type": "number", "minimum": -24, "maximum": 6 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "bitDepth", "sampleRateHz", "mix", "pulseMix", "triangleMix", "noiseMix", "drive"],
+          "properties": {
+            "type": { "const": "chiptune" },
+            "bitDepth": { "type": "integer", "minimum": 4, "maximum": 16 },
+            "sampleRateHz": { "type": "integer", "minimum": 1000, "maximum": 192000 },
+            "mix": { "type": "number", "minimum": 0, "maximum": 1 },
+            "outputGainDb": { "type": "number", "minimum": -24, "maximum": 6 },
+            "pulseMix": { "type": "number", "minimum": 0, "maximum": 1 },
+            "triangleMix": { "type": "number", "minimum": 0, "maximum": 1 },
+            "noiseMix": { "type": "number", "minimum": 0, "maximum": 1 },
+            "drive": { "type": "number", "minimum": 1, "maximum": 8 }
+          }
+        }
+      ]
+    }
+  }
+}

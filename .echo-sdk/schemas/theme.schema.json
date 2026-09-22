@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echo.example/schemas/workshop/theme.schema.json",
+  "title": "ECHO Workshop theme contribution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "schemaVersion", "id", "title", "basePreset"],
+  "properties": {
+    "type": { "const": "echo-workshop-theme-preset" },
+    "schemaVersion": { "const": 1 },
+    "id": { "$ref": "#/$defs/id" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "maxLength": 2000 },
+    "basePreset": { "$ref": "#/$defs/basePreset" },
+    "light": { "$ref": "#/$defs/tone" },
+    "dark": { "$ref": "#/$defs/tone" },
+    "swatches": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/hex" }
+    },
+    "backgroundAsset": { "$ref": "#/$defs/raster" },
+    "stylesheet": { "$ref": "#/$defs/cssPath" },
+    "skin": { "$ref": "#/$defs/skin" },
+    "runtime": { "$ref": "#/$defs/runtime" }
+  },
+  "anyOf": [
+    { "required": ["light"] },
+    { "required": ["dark"] }
+  ],
+  "$defs": {
+    "id": { "type": "string", "minLength": 3, "maxLength": 80, "pattern": "^[a-z0-9](?:[a-z0-9._-]{1,78}[a-z0-9])?$" },
+    "hex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^<>:\"|?*]+$" },
+    "cssPath": { "type": "string", "pattern": "^(?!/|\\\\|\\.)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*\\.css$" },
+    "htmlPath": { "type": "string", "pattern": "^(?!/|\\\\|\\.)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*\\.html$" },
+    "raster": { "type": "string", "pattern": "^(?!/|\\\\|\\.)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*\\.(?:png|jpg|jpeg|webp)$" },
+    "basePreset": {
+      "enum": [
+        "classic", "echoTwilight", "sakuraMilk", "peachSoda", "mintCandy", "berryDream",
+        "matchaCream", "lemonMochi", "cottonCloud", "melonCream", "seaSaltJelly", "caramelPudding",
+        "neonCandy", "childrenDoodle", "wisteriaBubble", "strawberryCookie", "graphiteAurora",
+        "amberNoir", "oceanStudio", "rosewoodVinyl", "shibuyaNight", "kyotoKurenai", "ukiyoIndigo",
+        "fujiSnow", "matsuriLantern", "ginzaNoir", "frostJazz", "celadonPorcelain", "polarDaybreak",
+        "plumVelvet", "midnightCopper", "taroBunny", "milkTeaBear", "ramuneGlass", "pistachioMousse",
+        "sakuraWagashi", "kamakuraHydrangea", "ruriKintsugi", "hinokiRyokan", "nightGlass",
+        "boneIron", "harborLamp", "ashRose"
+      ]
+    },
+    "tone": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "appBg": { "$ref": "#/$defs/hex" },
+        "appBg2": { "$ref": "#/$defs/hex" },
+        "appBg3": { "$ref": "#/$defs/hex" },
+        "panel": { "$ref": "#/$defs/hex" },
+        "panelSoft": { "$ref": "#/$defs/hex" },
+        "accent": { "$ref": "#/$defs/hex" },
+        "accentStrong": { "$ref": "#/$defs/hex" },
+        "secondary": { "$ref": "#/$defs/hex" },
+        "heading": { "$ref": "#/$defs/hex" },
+        "text": { "$ref": "#/$defs/hex" },
+        "muted": { "$ref": "#/$defs/hex" },
+        "border": { "$ref": "#/$defs/hex" },
+        "onAccent": { "$ref": "#/$defs/hex" },
+        "buttonText": { "$ref": "#/$defs/hex" },
+        "titlebar": { "$ref": "#/$defs/hex" },
+        "sidebar": { "$ref": "#/$defs/hex" },
+        "player": { "$ref": "#/$defs/hex" },
+        "field": { "$ref": "#/$defs/hex" },
+        "row": { "$ref": "#/$defs/hex" },
+        "rowHover": { "$ref": "#/$defs/hex" },
+        "rowActive": { "$ref": "#/$defs/hex" },
+        "chip": { "$ref": "#/$defs/hex" },
+        "focus": { "$ref": "#/$defs/hex" },
+        "danger": { "$ref": "#/$defs/hex" },
+        "success": { "$ref": "#/$defs/hex" },
+        "warning": { "$ref": "#/$defs/hex" },
+        "panelOpacityPercent": { "type": "number", "minimum": 40, "maximum": 100 },
+        "glassPercent": { "type": "number", "minimum": 0, "maximum": 80 },
+        "shadowPercent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "cornerRadiusPx": { "type": "number", "minimum": 0, "maximum": 28 },
+        "panelBlurPx": { "type": "number", "minimum": 0, "maximum": 32 },
+        "saturationPercent": { "type": "number", "minimum": 60, "maximum": 140 },
+        "motionSpeedSeconds": { "type": "number", "minimum": 0.12, "maximum": 8 },
+        "motionIntensityPercent": { "type": "number", "minimum": 0, "maximum": 160 },
+        "motionEnabled": { "type": "boolean" }
+      }
+    },
+    "skin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["chrome", "shell"] },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sidebarPosition": { "enum": ["left", "right"] },
+            "sidebarPresentation": { "enum": ["dock", "overlay", "rail"] },
+            "sidebarWidth": { "enum": ["narrow", "standard", "wide"] },
+            "playerStyle": { "enum": ["standard", "compact", "floating", "hero"] },
+            "titlebarStyle": { "enum": ["standard", "minimal", "immersive"] },
+            "contentDensity": { "enum": ["comfortable", "compact", "editorial"] },
+            "cardStyle": { "enum": ["flat", "raised", "glass", "outline"] },
+            "displayStyle": { "enum": ["default", "editorial", "technical", "playful"] },
+            "navStyle": { "enum": ["standard", "pills", "ghost"] },
+            "motion": { "enum": ["none", "gentle", "cinematic"] }
+          }
+        },
+        "stages": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "home": { "enum": ["standard", "hero", "cinema", "magazine"] },
+            "lyrics": { "enum": ["standard", "theater", "poster", "vinyl"] },
+            "queue": { "enum": ["standard", "tickets", "compact"] },
+            "songs": { "enum": ["standard", "poster", "dense"] },
+            "albums": { "enum": ["standard", "poster", "magazine"] },
+            "artists": { "enum": ["standard", "poster", "dense"] },
+            "playlists": { "enum": ["standard", "poster", "tickets"] },
+            "genres": { "enum": ["standard", "poster", "dense"] },
+            "liked": { "enum": ["standard", "poster", "dense"] },
+            "history": { "enum": ["standard", "tickets", "compact"] }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "background": { "$ref": "#/$defs/raster" },
+            "titlebar": { "$ref": "#/$defs/raster" },
+            "sidebar": { "$ref": "#/$defs/raster" },
+            "player": { "$ref": "#/$defs/raster" },
+            "page": { "$ref": "#/$defs/raster" },
+            "home": { "$ref": "#/$defs/raster" },
+            "lyrics": { "$ref": "#/$defs/raster" },
+            "queue": { "$ref": "#/$defs/raster" },
+            "nowPlaying": { "$ref": "#/$defs/raster" },
+            "watermark": { "$ref": "#/$defs/raster" }
+          }
+        },
+        "effects": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "grainPercent": { "type": "number", "minimum": 0, "maximum": 40 },
+            "vignettePercent": { "type": "number", "minimum": 0, "maximum": 60 },
+            "glowPercent": { "type": "number", "minimum": 0, "maximum": 80 },
+            "scrimPercent": { "type": "number", "minimum": 8, "maximum": 90 },
+            "bloomPercent": { "type": "number", "minimum": 0, "maximum": 50 },
+            "mistPercent": { "type": "number", "minimum": 0, "maximum": 40 },
+            "dimChromePercent": { "type": "number", "minimum": 0, "maximum": 60 },
+            "spotlightPercent": { "type": "number", "minimum": 0, "maximum": 80 },
+            "frostPercent": { "type": "number", "minimum": 0, "maximum": 40 }
+          }
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "brandPresentation": { "enum": ["echo", "asset", "hidden"] },
+            "brandAsset": { "$ref": "#/$defs/raster" },
+            "showEditionBadge": { "type": "boolean" },
+            "showVersion": { "type": "boolean" }
+          }
+        },
+        "iconAtlas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["asset", "columns", "rows", "map"],
+          "properties": {
+            "asset": { "$ref": "#/$defs/raster" },
+            "columns": { "type": "integer", "minimum": 1, "maximum": 16 },
+            "rows": { "type": "integer", "minimum": 1, "maximum": 16 },
+            "map": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+        "required": ["entry", "capabilities"],
+        "allOf": [{ "if": { "properties": { "presentation": { "const": "lyrics-background" } }, "required": ["presentation"] }, "then": { "properties": { "capabilities": { "items": { "enum": ["playback:read", "audio:spectrum"] } } } } }],
+      "properties": {
+          "entry": { "$ref": "#/$defs/htmlPath" },
+          "presentation": { "enum": ["shell", "lyrics-background"], "description": "Omit for the full UI shell. lyrics-background preserves the host lyrics and controls; only playback:read and audio:spectrum are allowed." },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "navigation",
+              "playback:read",
+              "playback:control",
+              "library:read",
+              "library:control",
+              "queue:read",
+              "queue:control",
+              "window:control",
+              "lyrics:read",
+              "audio:spectrum",
+              "storage"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

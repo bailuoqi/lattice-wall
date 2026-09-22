@@ -1,0 +1,21 @@
+{
+  "contractVersion": 1,
+  "maximumPackageBytes": 536870912,
+  "maximumFiles": 512,
+  "maximumFileBytes": 268435456,
+  "supportedAssetExtensions": [
+    ".cjs",
+    ".css",
+    ".dll",
+    ".exe",
+    ".html",
+    ".js",
+    ".json",
+    ".md",
+    ".mjs",
+    ".png",
+    ".pri",
+    ".svg",
+    ".winmd"
+  ]
+}

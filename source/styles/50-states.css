@@ -1,0 +1,95 @@
+body[data-state='booting'] .field,
+body[data-state='empty'] .field,
+body[data-state='denied'] .field {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body[data-state='ready'] .field {
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+
+body[data-reduced-motion='true'][data-state='ready'] .field {
+  transition: none;
+}
+
+.state {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px;
+  text-align: center;
+  color: var(--host-text);
+  background: var(--host-app-bg);
+}
+
+.state[hidden] {
+  display: none;
+}
+
+.state__title {
+  margin: 0;
+  font-size: clamp(20px, 2.4vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.state__body {
+  max-width: 460px;
+  margin: 0;
+  color: var(--host-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.state[data-state='denied'] .state__title::before {
+  content: '';
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--host-accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--host-accent) 22%, transparent);
+}
+
+.state[data-state='booting'] .state__title::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 0 auto 14px;
+  border: 2px solid color-mix(in srgb, var(--host-accent) 30%, transparent);
+  border-top-color: var(--host-accent);
+  border-radius: 50%;
+  animation: state-spin 0.9s linear infinite;
+}
+
+body[data-reduced-motion='true'] .state[data-state='booting'] .state__title::before {
+  animation: none;
+}
+
+@keyframes state-spin {
+  to { transform: rotate(360deg); }
+}
+
+.notice {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--host-border) 60%, transparent);
+  border-radius: 999px;
+  color: var(--host-muted);
+  background: color-mix(in srgb, var(--host-panel) 82%, transparent);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}

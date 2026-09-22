@@ -1,0 +1,100 @@
+.lattice {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+.field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  outline: none;
+  isolation: isolate;
+}
+
+body[data-dragging="true"] .field {
+  cursor: grabbing;
+}
+
+/* Painted above the children, unlike an inset shadow on .field, which the glow layer would cover. */
+.field:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--host-accent) 55%, transparent);
+  outline-offset: -2px;
+}
+
+.field::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60% 55% at 18% 20%, color-mix(in srgb, var(--host-accent) 34%, transparent), transparent 70%),
+    radial-gradient(55% 60% at 82% 78%, color-mix(in srgb, var(--host-accent-2) 26%, transparent), transparent 70%),
+    var(--host-app-bg);
+}
+
+/*
+ * Grain: base64 SVG (220×220) with <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2"
+ * stitchTiles="stitch"> followed by <feColorMatrix type="saturate" values="0">, filling a <rect>.
+ * Plain alpha blending on purpose: a mix-blend-mode here forces the compositor to render the whole
+ * isolated .field (the moving wall included) into an offscreen surface on every frame.
+ */
+.field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyMjAnIGhlaWdodD0nMjIwJz48ZmlsdGVyIGlkPSduJyB4PScwJyB5PScwJyB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nLjg1JyBudW1PY3RhdmVzPScyJyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+PGZlQ29sb3JNYXRyaXggdHlwZT0nc2F0dXJhdGUnIHZhbHVlcz0nMCcvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPScyMjAnIGhlaWdodD0nMjIwJyBmaWx0ZXI9J3VybCgjbiknLz48L3N2Zz4=");
+  background-size: 220px 220px;
+}
+
+html[data-color-scheme="light"] .field::before {
+  background:
+    radial-gradient(60% 55% at 18% 20%, color-mix(in srgb, var(--host-accent) 22%, transparent), transparent 70%),
+    radial-gradient(55% 60% at 82% 78%, color-mix(in srgb, var(--host-accent-2) 16%, transparent), transparent 70%),
+    var(--host-app-bg);
+}
+
+html[data-color-scheme="light"] .field::after {
+  opacity: 0.035;
+}
+
+.world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  z-index: 1;
+}
+
+.field__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(ellipse at center, transparent 46%, rgb(0 0 0 / 74%) 100%);
+}
+
+body[data-vignette="true"] .field__vignette {
+  opacity: 1;
+}
+
+body[data-lighting="daytime"] .field__vignette {
+  opacity: 0;
+}
+
+html[data-color-scheme="light"] .field__vignette {
+  background: radial-gradient(ellipse at center, transparent 46%, rgb(0 0 0 / 48%) 100%);
+}

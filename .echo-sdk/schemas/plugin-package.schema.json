@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echo.example/schemas/workshop/plugin-package.schema.json",
+  "title": "ECHO Workshop sandbox plug-in package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "version", "exportedAt", "manifest", "files"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "type": { "const": "echo-plugin-package" },
+    "version": { "const": 1 },
+    "exportedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "version", "apiVersion", "entry"],
+      "properties": {
+        "id": { "type": "string", "minLength": 3, "maxLength": 80, "pattern": "^[a-z0-9](?:[a-z0-9._-]{1,78}[a-z0-9])?$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9a-z]+(?:[.-][0-9a-z]+)*)?$" },
+        "apiVersion": { "enum": [1, 2] },
+        "minEchoVersion": { "type": "string", "maxLength": 40 },
+        "entry": { "allOf": [{ "$ref": "#/$defs/path" }, { "pattern": "\\.js$" }] },
+        "trustedEntry": { "allOf": [{ "$ref": "#/$defs/path" }, { "pattern": "\\.mjs$" }] },
+        "panel": { "allOf": [{ "$ref": "#/$defs/path" }, { "pattern": "\\.html$" }] },
+        "permissions": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "navigation",
+              "playback:read",
+              "playback:control",
+              "playback:share",
+              "audio:spectrum",
+              "audio:dsp-read",
+              "audio:dsp-write",
+              "audio:offline-read",
+              "library:read",
+              "library:control",
+              "queue:read",
+              "queue:control",
+              "sources:provide",
+              "sources:direct",
+              "network:request",
+              "agent:runtime",
+              "lyrics:provide",
+              "lyrics:read",
+              "fs:plugin",
+              "fs:export",
+              "system:full"
+            ]
+          }
+        },
+        "contributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } },
+            "trackContextMenus": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/trackContextMenu" } },
+            "playerBarActions": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/playerBarAction" } },
+            "panels": { "type": "array", "items": { "$ref": "#/$defs/panel" } },
+            "agents": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/agent" } },
+            "sourceProviders": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/provider" } },
+            "lyricsProviders": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/provider" } },
+            "metadataProviders": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/provider" } },
+            "coverProviders": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/provider" } },
+            "themePresets": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/themePreset" } },
+            "settings": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/setting" } }
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "content"],
+        "properties": {
+          "path": { "allOf": [{ "$ref": "#/$defs/path" }, { "pattern": "\\.(?:css|html|js|json|mjs)$" }] },
+          "content": { "type": "string", "maxLength": 524288 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^<>:\"|?*]+$" },
+    "contributionId": { "type": "string", "minLength": 3, "maxLength": 80, "pattern": "^[a-z0-9](?:[a-z0-9._-]{1,78}[a-z0-9])?$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 180 },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/description" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/description" },
+        "timeoutMs": { "type": "integer", "minimum": 1 },
+        "confirm": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "parameters": {
+          "type": "array",
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/commandParameter" }
+        }
+      }
+    },
+    "commandParameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/description" },
+        "type": { "enum": ["string", "select", "boolean", "number"] },
+        "defaultValue": { "type": ["string", "number", "boolean", "null"] },
+        "options": {
+          "type": "array",
+          "maxItems": 24,
+          "items": { "$ref": "#/$defs/settingOption" }
+        },
+        "placeholder": { "type": "string", "maxLength": 120 },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "exclusiveMinimum": 0 },
+        "required": { "type": "boolean" }
+      }
+    },
+    "trackContextMenu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "commandId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "commandId": { "$ref": "#/$defs/contributionId" },
+        "description": { "$ref": "#/$defs/description" },
+        "localOnly": { "type": "boolean" }
+      }
+    },
+    "playerBarAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "commandId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "commandId": { "$ref": "#/$defs/contributionId" },
+        "description": { "$ref": "#/$defs/description" },
+        "icon": { "enum": ["blocks", "sparkles", "bot", "radio", "list-music", "heart", "bookmark", "zap"] }
+      }
+    },
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "path"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "path": { "allOf": [{ "$ref": "#/$defs/path" }, { "pattern": "\\.html$" }] },
+        "placement": { "enum": ["main", "utility", "sidebar", "home", "lyrics", "queue", "track-detail", "player"] }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/description" },
+        "inputPlaceholder": { "type": "string", "maxLength": 120 }
+      }
+    },
+    "settingOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "value"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "value": { "type": "string", "minLength": 1, "maxLength": 160 }
+      }
+    },
+    "setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/description" },
+        "type": { "enum": ["string", "select", "boolean", "number", "color", "range"] },
+        "defaultValue": { "type": ["string", "number", "boolean", "null"] },
+        "options": { "type": "array", "maxItems": 24, "items": { "$ref": "#/$defs/settingOption" } },
+        "placeholder": { "type": "string", "maxLength": 120 },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "exclusiveMinimum": 0 },
+        "required": { "type": "boolean" }
+      }
+    },
+    "themePreset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "basePreset"],
+      "properties": {
+        "id": { "$ref": "#/$defs/contributionId" },
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/description" },
+        "basePreset": { "type": "string", "minLength": 1, "maxLength": 80, "not": { "const": "FINAL" } },
+        "light": { "type": "object" },
+        "dark": { "type": "object" },
+        "preview": { "type": "string", "maxLength": 240 },
+        "swatches": { "type": "array", "maxItems": 6, "uniqueItems": true, "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } }
+      }
+    }
+  }
+}

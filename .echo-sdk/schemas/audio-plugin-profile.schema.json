@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echo.example/schemas/workshop/audio-plugin-profile.schema.json",
+  "title": "ECHO Workshop audio plug-in profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "schemaVersion", "id", "title", "format", "plugin"],
+  "properties": {
+    "type": { "const": "echo-workshop-audio-plugin-profile" },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 3, "maxLength": 80 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string" },
+    "format": { "const": "vst3" },
+    "role": { "enum": ["effect", "instrument"] },
+    "plugin": {
+      "type": "object",
+      "required": ["classId", "name", "vendor"],
+      "properties": {
+        "classId": { "type": "string" },
+        "name": { "type": "string" },
+        "vendor": { "type": "string" }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "properties": {
+        "api": { "const": "echo.audio-plugin-adapter" },
+        "minimumVersion": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "properties": {
+        "placement": { "enum": ["pre-dsp", "post-dsp"] }
+      }
+    },
+    "parameters": { "type": "array" },
+    "presets": { "type": "array" }
+  }
+}

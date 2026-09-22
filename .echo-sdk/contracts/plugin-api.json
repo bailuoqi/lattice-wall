@@ -1,0 +1,477 @@
+{
+  "apiVersion": 2,
+  "actions": {
+    "host:getCapabilities": {
+      "method": "echo.host.getCapabilities",
+      "permission": null
+    },
+    "host:getFeatureAvailability": {
+      "method": "echo.host.getFeatureAvailability",
+      "permission": null
+    },
+    "ui:getContext": {
+      "method": "echo.ui.getContext",
+      "permission": null
+    },
+    "ui:setPanelPresentation": {
+      "method": "echo.ui.setPanelPresentation",
+      "permission": null
+    },
+    "ui:closePanel": {
+      "method": "echo.ui.closePanel",
+      "permission": null
+    },
+    "ui:openPanel": {
+      "method": "echo.ui.openPanel",
+      "permission": null
+    },
+    "navigation:open": {
+      "method": "echo.navigation.open",
+      "permission": "navigation"
+    },
+    "playback:getStatus": {
+      "method": "echo.playback.getStatus",
+      "permission": "playback:read"
+    },
+    "playback:play": {
+      "method": "echo.playback.play",
+      "permission": "playback:control"
+    },
+    "playback:pause": {
+      "method": "echo.playback.pause",
+      "permission": "playback:control"
+    },
+    "playback:seek": {
+      "method": "echo.playback.seek",
+      "permission": "playback:control"
+    },
+    "playback:previous": {
+      "method": "echo.playback.previous",
+      "permission": "playback:control"
+    },
+    "playback:next": {
+      "method": "echo.playback.next",
+      "permission": "playback:control"
+    },
+    "playback:setVolume": {
+      "method": "echo.playback.setVolume",
+      "permission": "playback:control"
+    },
+    "playback:setShuffle": {
+      "method": "echo.playback.setShuffle",
+      "permission": "playback:control"
+    },
+    "playback:toggleShuffle": {
+      "method": "echo.playback.toggleShuffle",
+      "permission": "playback:control"
+    },
+    "playback:setRepeat": {
+      "method": "echo.playback.setRepeat",
+      "permission": "playback:control"
+    },
+    "playback:cycleRepeat": {
+      "method": "echo.playback.cycleRepeat",
+      "permission": "playback:control"
+    },
+    "playback:getShareInfo": {
+      "method": "echo.playback.getShareInfo",
+      "permission": "playback:share"
+    },
+    "playback:shareCurrentTrack": {
+      "method": "echo.playback.shareCurrentTrack",
+      "permission": "playback:share"
+    },
+    "playback:getShareTask": {
+      "method": "echo.playback.getShareTask",
+      "permission": "playback:share"
+    },
+    "playback:playUrl": {
+      "method": "echo.playback.playUrl",
+      "permission": "playback:share"
+    },
+    "audio:getSpectrum": {
+      "method": "echo.audio.getSpectrum",
+      "permission": "audio:spectrum"
+    },
+    "audio:dsp:getModule": {
+      "method": "echo.audio.dsp.getModule",
+      "permission": "audio:dsp-read"
+    },
+    "audio:dsp:getRackOrder": {
+      "method": "echo.audio.dsp.getRackOrder",
+      "permission": "audio:dsp-read"
+    },
+    "audio:dsp:setModule": {
+      "method": "echo.audio.dsp.setModule",
+      "permission": "audio:dsp-write"
+    },
+    "audio:dsp:setRackOrder": {
+      "method": "echo.audio.dsp.setRackOrder",
+      "permission": "audio:dsp-write"
+    },
+    "audio:offline:open": {
+      "method": "echo.audio.offline.open",
+      "permission": "audio:offline-read"
+    },
+    "audio:offline:read": {
+      "method": "echo.audio.offline.read",
+      "permission": "audio:offline-read"
+    },
+    "audio:offline:close": {
+      "method": "echo.audio.offline.close",
+      "permission": "audio:offline-read"
+    },
+    "library:getSummary": {
+      "method": "echo.library.getSummary",
+      "permission": "library:read"
+    },
+    "library:getTracks": {
+      "method": "echo.library.getTracks",
+      "permission": "library:read"
+    },
+    "library:getTrack": {
+      "method": "echo.library.getTrack",
+      "permission": "library:read"
+    },
+    "library:getAlbums": {
+      "method": "echo.library.getAlbums",
+      "permission": "library:read"
+    },
+    "library:getAlbumTracks": {
+      "method": "echo.library.getAlbumTracks",
+      "permission": "library:read"
+    },
+    "library:getArtists": {
+      "method": "echo.library.getArtists",
+      "permission": "library:read"
+    },
+    "library:getArtistTracks": {
+      "method": "echo.library.getArtistTracks",
+      "permission": "library:read"
+    },
+    "library:getArtistAlbums": {
+      "method": "echo.library.getArtistAlbums",
+      "permission": "library:read"
+    },
+    "library:getGenres": {
+      "method": "echo.library.getGenres",
+      "permission": "library:read"
+    },
+    "library:getGenreTracks": {
+      "method": "echo.library.getGenreTracks",
+      "permission": "library:read"
+    },
+    "library:getGenreAlbums": {
+      "method": "echo.library.getGenreAlbums",
+      "permission": "library:read"
+    },
+    "library:getPlaylists": {
+      "method": "echo.library.getPlaylists",
+      "permission": "library:read"
+    },
+    "library:getPlaylistItems": {
+      "method": "echo.library.getPlaylistItems",
+      "permission": "library:read"
+    },
+    "library:getLikedTracks": {
+      "method": "echo.library.getLikedTracks",
+      "permission": "library:read"
+    },
+    "library:getLikedTrackIds": {
+      "method": "echo.library.getLikedTrackIds",
+      "permission": "library:read"
+    },
+    "library:toggleTrackLiked": {
+      "method": "echo.library.toggleTrackLiked",
+      "permission": "library:control"
+    },
+    "library:toggleAlbumLiked": {
+      "method": "echo.library.toggleAlbumLiked",
+      "permission": "library:control"
+    },
+    "library:createPlaylist": {
+      "method": "echo.library.createPlaylist",
+      "permission": "library:control"
+    },
+    "library:addTracksToPlaylist": {
+      "method": "echo.library.addTracksToPlaylist",
+      "permission": "library:control"
+    },
+    "queue:get": {
+      "method": "echo.queue.get",
+      "permission": "queue:read"
+    },
+    "queue:playTrack": {
+      "method": "echo.queue.playTrack",
+      "permission": "queue:control"
+    },
+    "queue:enqueueTrack": {
+      "method": "echo.queue.enqueueTrack",
+      "permission": "queue:control"
+    },
+    "queue:playItem": {
+      "method": "echo.queue.playItem",
+      "permission": "queue:control"
+    },
+    "queue:moveItem": {
+      "method": "echo.queue.moveItem",
+      "permission": "queue:control"
+    },
+    "queue:removeItem": {
+      "method": "echo.queue.removeItem",
+      "permission": "queue:control"
+    },
+    "queue:clear": {
+      "method": "echo.queue.clear",
+      "permission": "queue:control"
+    },
+    "queue:playAlbum": {
+      "method": "echo.queue.playAlbum",
+      "permission": "queue:control"
+    },
+    "queue:playArtist": {
+      "method": "echo.queue.playArtist",
+      "permission": "queue:control"
+    },
+    "queue:playGenre": {
+      "method": "echo.queue.playGenre",
+      "permission": "queue:control"
+    },
+    "queue:playPlaylist": {
+      "method": "echo.queue.playPlaylist",
+      "permission": "queue:control"
+    },
+    "queue:playLiked": {
+      "method": "echo.queue.playLiked",
+      "permission": "queue:control"
+    },
+    "source-provider:search": {
+      "method": "echo.sources.search",
+      "permission": "sources:provide"
+    },
+    "source-provider:browse": {
+      "method": "echo.sources.browse",
+      "permission": "sources:provide"
+    },
+    "source-provider:listCollection": {
+      "method": "echo.sources.listCollection",
+      "permission": "sources:provide"
+    },
+    "source-provider:resolve": {
+      "method": "echo.sources.resolve",
+      "permission": "sources:provide"
+    },
+    "sources:playDirect": {
+      "method": "echo.sources.playDirect",
+      "permission": "sources:direct"
+    },
+    "sources:enqueueDirect": {
+      "method": "echo.sources.enqueueDirect",
+      "permission": "sources:direct"
+    },
+    "sources:playQueue": {
+      "method": "echo.sources.playQueue",
+      "permission": "sources:direct"
+    },
+    "network:request": {
+      "method": "echo.network.request/get/post",
+      "permission": "network:request"
+    },
+    "agent:run": {
+      "method": "echo.agents.run",
+      "permission": "agent:runtime"
+    },
+    "lyrics:get": {
+      "method": "echo.lyrics.get",
+      "permission": "lyrics:read"
+    },
+    "settings:get": {
+      "method": "echo.settings.get",
+      "permission": "fs:plugin"
+    },
+    "settings:set": {
+      "method": "echo.settings.set",
+      "permission": "fs:plugin"
+    },
+    "storage:get": {
+      "method": "echo.storage.get",
+      "permission": "fs:plugin"
+    },
+    "storage:set": {
+      "method": "echo.storage.set",
+      "permission": "fs:plugin"
+    },
+    "storage:remove": {
+      "method": "echo.storage.remove",
+      "permission": "fs:plugin"
+    },
+    "files:export": {
+      "method": "echo.files.export",
+      "permission": "fs:export"
+    },
+    "trusted:invoke": {
+      "method": "echo.trusted.invoke",
+      "permission": "system:full"
+    },
+    "ui:notify": {
+      "method": "echo.ui.notify",
+      "permission": null
+    }
+  },
+  "registrations": {
+    "echo.commands.register": {
+      "permission": null,
+      "declaration": "manifest.contributes.commands"
+    },
+    "echo.agents.register": {
+      "permission": "agent:runtime",
+      "declaration": "manifest.contributes.agents"
+    },
+    "echo.sources.registerProvider": {
+      "permission": "sources:provide",
+      "declaration": "manifest.contributes.sourceProviders"
+    },
+    "echo.lyrics.registerProvider": {
+      "permission": "lyrics:provide",
+      "declaration": "manifest.contributes.lyricsProviders"
+    },
+    "echo.metadata.registerProvider": {
+      "permission": null,
+      "declaration": "manifest.contributes.metadataProviders"
+    },
+    "echo.covers.registerProvider": {
+      "permission": null,
+      "declaration": "manifest.contributes.coverProviders"
+    }
+  },
+  "events": {
+    "playback:status": "playback:read",
+    "audio:spectrum": "audio:spectrum",
+    "queue:changed": "queue:read",
+    "library:changed": "library:read",
+    "library:liked-changed": "library:read",
+    "settings:changed": "fs:plugin"
+  },
+  "commonErrors": {
+    "panel-context-required": {
+      "retry": false,
+      "recovery": "Call panel presentation or close methods only from the currently visible sandbox panel; background runtimes cannot mutate host chrome."
+    },
+    "capability-denied": {
+      "retry": false,
+      "recovery": "Declare the listed permission, rerun check, and let the subscriber review the changed capability."
+    },
+    "action-unavailable": {
+      "retry": false,
+      "recovery": "Check API 2 compatibility and the minimum ECHO version; do not probe undocumented host actions."
+    },
+    "invalid-payload": {
+      "retry": false,
+      "recovery": "Validate and bound the arguments before calling the method."
+    },
+    "message-too-large": {
+      "retry": false,
+      "recovery": "Reduce the serialized request below the documented bridge message limit."
+    },
+    "response-too-large": {
+      "retry": false,
+      "recovery": "Request a bounded page or smaller result; the host will not forward an oversized response."
+    },
+    "rate-limited": {
+      "retry": true,
+      "recovery": "Back off and coalesce repeated reads or UI events."
+    },
+    "concurrency-limited": {
+      "retry": true,
+      "recovery": "Await outstanding host requests and keep at most 8 in flight."
+    },
+    "plugin-request-concurrency-exceeded": {
+      "retry": true,
+      "recovery": "Await outstanding bridge requests and keep at most 32 promises pending."
+    },
+    "plugin-request-timeout": {
+      "retry": true,
+      "recovery": "Handle the failure; retry only idempotent reads with backoff."
+    },
+    "trusted-runtime-concurrency-limited": {
+      "retry": true,
+      "recovery": "Await outstanding full-trust invokes and keep at most 32 pending for one plug-in."
+    },
+    "trusted-runtime-input-invalid": {
+      "retry": false,
+      "recovery": "Pass a JSON-serializable input below the trusted runtime input limit."
+    },
+    "trusted-runtime-result-invalid": {
+      "retry": false,
+      "recovery": "Return a JSON-serializable bounded result from trustedEntry."
+    },
+    "trusted-runtime-heartbeat-timeout": {
+      "retry": false,
+      "recovery": "The utility process stopped responding and was terminated; inspect the plug-in before manually retrying."
+    },
+    "trusted-runtime-quarantined": {
+      "retry": false,
+      "recovery": "The plug-in crashed three times in ten minutes; review it and explicitly re-enable it to retry."
+    },
+    "command-unavailable": {
+      "retry": false,
+      "recovery": "Refresh host state and disable the unavailable control."
+    },
+    "queue-unavailable": {
+      "retry": true,
+      "recovery": "Wait for the host queue to become ready before retrying."
+    },
+    "playback-unavailable": {
+      "retry": true,
+      "recovery": "Wait for playback initialization and refresh status."
+    },
+    "library-unavailable": {
+      "retry": true,
+      "recovery": "Wait for library initialization and rerun the read."
+    },
+    "direct-source-denied": {
+      "retry": false,
+      "recovery": "The subscriber denied this origin for the session; do not prompt in a loop."
+    },
+    "share-denied": {
+      "retry": false,
+      "recovery": "The subscriber denied this upload; keep the feature idle until another explicit action."
+    },
+    "network-host-denied": {
+      "retry": false,
+      "recovery": "Use a default-port HTTP(S) host declared in networkHosts; private, reserved and undeclared targets remain blocked."
+    },
+    "network-port-denied": {
+      "retry": false,
+      "recovery": "Use the default HTTPS port; custom ports are outside the plug-in network contract."
+    },
+    "network-address-denied": {
+      "retry": false,
+      "recovery": "Use a public destination; loopback, LAN, reserved and mixed public/private DNS answers are blocked."
+    },
+    "network-capability-denied": {
+      "retry": false,
+      "recovery": "Declare network:request and the exact networkHosts entry, then let the subscriber review the capability."
+    },
+    "share-destination-denied": {
+      "retry": false,
+      "recovery": "Use a default-port HTTP(S) upload host declared by the plug-in and approved for playback sharing; HTTPS is strongly recommended."
+    },
+    "track-unavailable": {
+      "retry": false,
+      "recovery": "Refresh the sanitized library or queue snapshot and stop using the stale track id."
+    },
+    "playlist-unavailable": {
+      "retry": false,
+      "recovery": "Refresh local playlists; remote or removed playlists cannot be controlled through this API."
+    },
+    "setting-undeclared": {
+      "retry": false,
+      "recovery": "Declare the setting in manifest.contributes.settings before reading or writing it."
+    },
+    "storage-quota-exceeded": {
+      "retry": false,
+      "recovery": "Reduce the JSON value below 16 KiB and the plug-in namespace below 64 KiB."
+    }
+  }
+}

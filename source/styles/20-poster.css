@@ -1,0 +1,340 @@
+/* Poster cards. Position and size come from inline `transform` / `width` / `height` written by
+   posterWall.ts; nothing below may set `transform` on `.poster` itself. */
+
+.poster {
+  --expanded-pad: clamp(18px, 4.5%, 40px);
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  border-radius: 0;
+  overflow: hidden;
+  contain: layout paint;
+  background: var(--host-panel);
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform;
+}
+
+/* Covers stay borderless when focused or expanded. */
+.poster:focus-visible {
+  outline: none;
+}
+
+.poster[data-expanded="true"] {
+  z-index: 10;
+  cursor: default;
+}
+
+/* Layers ------------------------------------------------------------------------------------- */
+
+.poster__body {
+  position: absolute;
+  inset: 0;
+  transform-origin: center;
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1), filter .28s ease;
+}
+
+/* Scale follows pointer or keyboard focus. Lighting is only hover / playing / expanded. */
+.poster:hover .poster__body,
+.poster[data-focused="true"] .poster__body {
+  transform: scale(var(--hx, 1.06), var(--hy, 1.06));
+}
+
+.poster:hover .poster__body {
+  filter: saturate(1.22) brightness(1.16);
+}
+
+body[data-dragging="true"] .poster .poster__body {
+  transform: none;
+  filter: none;
+}
+
+.poster[data-expanded="true"] .poster__body {
+  transform: none;
+  filter: brightness(1.18) saturate(1.12);
+}
+
+.poster__fallback {
+  position: absolute;
+  inset: 0;
+}
+
+.poster__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  -webkit-user-drag: none;
+}
+
+.poster__cover[hidden] {
+  display: none;
+}
+
+.poster__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, transparent 38%, color-mix(in srgb, var(--shade-color, #000) 74%, transparent) 100%),
+    linear-gradient(90deg, color-mix(in srgb, var(--shade-color, #000) 46%, transparent), transparent 40%);
+  opacity: .9;
+}
+
+.poster[data-expanded="true"] .poster__shade {
+  background:
+    linear-gradient(180deg, transparent 14%, color-mix(in srgb, var(--shade-color, #000) 48%, transparent) 56%, color-mix(in srgb, var(--shade-color, #000) 94%, transparent) 100%),
+    linear-gradient(90deg, color-mix(in srgb, var(--shade-color, #000) 76%, transparent), transparent 58%),
+    radial-gradient(85% 75% at 0% 100%, color-mix(in srgb, var(--shade-color, #000) 58%, transparent), transparent 72%);
+  opacity: 1;
+}
+
+.poster__tint {
+  position: absolute;
+  inset: 0;
+  /* theme-color-allow: neutral cover shading must stay black in every host theme. */
+  background: var(--tint-color, #000);
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+
+.world[data-tint="true"] .poster:not([data-current="true"]):not([data-expanded="true"]):not(:hover) .poster__tint {
+  opacity: var(--tint-alpha, .5);
+}
+
+body[data-dragging="true"] .world[data-tint="true"] .poster:not([data-current="true"]):not([data-expanded="true"]) .poster__tint {
+  opacity: var(--tint-alpha, .5);
+}
+
+.poster__lights {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+
+.world[data-lights-out="true"] .poster:not([data-current="true"]):not([data-expanded="true"]):not(:hover) .poster__lights {
+  opacity: .72;
+}
+
+body[data-dragging="true"] .world[data-lights-out="true"] .poster:not([data-current="true"]):not([data-expanded="true"]) .poster__lights {
+  opacity: .72;
+}
+
+/* An open card is the only bright one; other current-track copies dim with the rest. */
+.world:has(> .poster[data-expanded="true"]) .poster:not([data-expanded="true"]) .poster__lights {
+  opacity: .34;
+}
+
+.world[data-lights-out="true"]:has(> .poster[data-expanded="true"]) .poster:not([data-expanded="true"]) .poster__lights {
+  opacity: .8;
+}
+
+/* Daytime: idle covers stay equally bright. Expanded cards keep their own scrim for type. */
+body[data-lighting="daytime"] .poster:not([data-expanded="true"]) .poster__shade,
+body[data-lighting="daytime"] .poster:not([data-expanded="true"]) .poster__tint,
+body[data-lighting="daytime"] .poster:not([data-expanded="true"]) .poster__lights,
+body[data-lighting="daytime"] .world:has(> .poster[data-expanded="true"]) .poster:not([data-expanded="true"]) .poster__lights {
+  opacity: 0;
+}
+
+/* Expanded card content ---------------------------------------------------------------------- */
+
+@property --lyrics-open {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.poster__expanded {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  row-gap: 12px;
+  box-sizing: border-box;
+  padding: var(--expanded-pad);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+.poster[data-expanded="true"][data-settled="true"] .poster__expanded {
+  opacity: 1;
+}
+
+.poster__meta {
+  order: 1;
+  margin-top: auto;
+  flex: none;
+  min-width: 0;
+  pointer-events: none;
+  container-type: inline-size;
+}
+
+.poster__title {
+  margin: 0;
+  width: 100%;
+  font-weight: 700;
+  font-size: clamp(56px, 10.5cqw, 96px);
+  line-height: 1.15;
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: -.02em;
+  text-shadow: 0 2px 14px rgb(0 0 0 / 42%);
+  overflow-wrap: break-word;
+  overflow: visible;
+  padding-inline-end: .04em;
+}
+
+.poster__title-text {
+  display: block;
+  transform-origin: top left;
+  transform: scale(var(--title-scale));
+  /* Stable text raster and line breaks; the parent reserves the actual scaled height. */
+  will-change: transform;
+}
+
+.poster__artist {
+  margin: .35em 0 0;
+  font-size: clamp(16px, 2.2cqw, 24px);
+  line-height: 1.3;
+  color: rgb(255 255 255 / 82%);
+  text-shadow: 0 2px 14px rgb(0 0 0 / 50%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poster__artist:empty {
+  display: none;
+}
+
+.poster__lyrics {
+  order: 2;
+  position: relative;
+  flex: 0 0 auto;
+  max-height: 0;
+  min-height: 0;
+  overflow: hidden;
+  /* inline-size only: `size` containment makes auto height ignore children, so the slot stays 0. */
+  container-type: inline-size;
+  /* One inherited progress value drives both directions, including interruptions. */
+}
+
+.poster__lyrics .lyrics {
+  height: auto;
+  overflow: visible;
+  justify-content: flex-start;
+}
+
+/* Taps on the empty controls row (or on a hidden cluster) fall through to the card. */
+.poster__controls {
+  order: 3;
+  flex: none;
+  pointer-events: none;
+}
+
+.poster__controls > * {
+  pointer-events: auto;
+}
+
+/* The queue wall owns this motion; album cards retain their existing layout. */
+.poster__expanded:not(.poster__expanded--album) {
+  flex-direction: column-reverse;
+}
+
+.poster__expanded:not(.poster__expanded--album) .poster__meta {
+  order: 3;
+  margin-top: 0;
+}
+
+.poster__expanded:not(.poster__expanded--album) .poster__controls {
+  order: 1;
+}
+
+.poster__expanded:not(.poster__expanded--album) .poster__title {
+  --title-scale: calc(1 - var(--lyrics-open) * (1 - var(--title-open-scale, 1)));
+  height: calc(var(--title-natural-height) * var(--title-scale));
+}
+
+.poster__expanded:not(.poster__expanded--album) .poster__lyrics {
+  max-height: none;
+  height: calc(var(--lyrics-open-height, 0px) * var(--lyrics-open));
+}
+
+.poster__expanded:not(.poster__expanded--album) .lyrics {
+  transform: translateZ(0);
+  opacity: var(--lyrics-open);
+}
+
+.poster__expanded:not(.poster__expanded--album) .poster__artist {
+  transform: translateZ(0);
+}
+
+/* Entrance wave + fade-in for cards culled in later ------------------------------------------- */
+
+.poster--enter .poster__body {
+  animation: poster-enter .45s cubic-bezier(.2, .8, .2, 1) both;
+  animation-delay: var(--enter-delay, 0s);
+}
+
+.poster--fade .poster__body {
+  animation: poster-fade .12s ease-out both;
+}
+
+@keyframes poster-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes poster-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Reduced motion: no hover scale, no wave, no springs (JS snaps), keep the hover filter --------- */
+
+.world[data-reduced-motion="true"] .poster,
+body[data-reduced-motion="true"] .poster {
+  transition: none;
+}
+
+.world[data-reduced-motion="true"] .poster .poster__body,
+body[data-reduced-motion="true"] .poster .poster__body {
+  transform: none;
+  transition: none;
+  animation: none;
+}
+
+.world[data-reduced-motion="true"] .poster .poster__expanded,
+body[data-reduced-motion="true"] .poster .poster__expanded,
+.world[data-reduced-motion="true"] .poster .poster__meta,
+body[data-reduced-motion="true"] .poster .poster__meta,
+.world[data-reduced-motion="true"] .poster .poster__title,
+body[data-reduced-motion="true"] .poster .poster__title,
+.world[data-reduced-motion="true"] .poster .poster__lyrics,
+body[data-reduced-motion="true"] .poster .poster__lyrics,
+.world[data-reduced-motion="true"] .poster .poster__tint,
+body[data-reduced-motion="true"] .poster .poster__tint,
+.world[data-reduced-motion="true"] .poster .poster__lights,
+body[data-reduced-motion="true"] .poster .poster__lights {
+  transition: none;
+  animation: none;
+}

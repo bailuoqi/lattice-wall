@@ -1,0 +1,109 @@
+.album-tracks :focus-visible {
+  outline: 2px solid var(--host-accent);
+  outline-offset: 2px;
+}
+.poster__expanded--album {
+  --album-scale: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  row-gap: calc(16px / var(--album-scale));
+}
+.poster__expanded--album .poster__meta {
+  order: unset;
+  margin-top: 0;
+  grid-row: 1;
+  pointer-events: auto;
+}
+.poster__expanded--album .poster__lyrics {
+  order: unset;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
+  grid-row: 2;
+}
+.poster__expanded--album .poster__controls {
+  order: unset;
+  grid-row: 3;
+}
+.poster__expanded--album .poster__title {
+  font-size: clamp(28px, 5.4cqw, 52px);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  -webkit-line-clamp: 2;
+}
+.poster__expanded--album .poster__artist {
+  font-size: clamp(14px, 2cqw, 20px);
+}
+.album-details { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.album-details[hidden],
+.album-actions[hidden] { display: none; }
+.album-details__message { margin: 0 0 calc(8px / var(--album-scale)); font-size: calc(12px / var(--album-scale)); color: rgb(255 255 255 / 75%); }
+.album-tracks {
+  --album-scroll-outset: max(0px, calc(var(--expanded-pad) - 12px / var(--album-scale)));
+  flex: 1;
+  min-height: 0;
+  margin-right: calc(-1 * var(--album-scroll-outset));
+  padding-right: var(--album-scroll-outset);
+  overflow: auto;
+  overflow-anchor: none;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-gutter: stable;
+}
+/* theme-color-allow: a neutral thumb floats over cover artwork without a native dark track. */
+.album-tracks::-webkit-scrollbar { width: calc(8px / var(--album-scale)); height: calc(8px / var(--album-scale)); background: transparent; }
+.album-tracks::-webkit-scrollbar-track,
+.album-tracks::-webkit-scrollbar-corner { background: transparent; }
+.album-tracks::-webkit-scrollbar-track { margin-block: calc(24px / var(--album-scale)); }
+.album-tracks::-webkit-scrollbar-thumb {
+  /* A 4px visible stroke retains an 8px drag target. Insets also shorten its travel. */
+  border: calc(2px / var(--album-scale)) solid transparent;
+  background: rgb(255 255 255 / 45%);
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+.album-tracks::-webkit-scrollbar-thumb:hover { background-color: rgb(255 255 255 / 65%); }
+.album-tracks::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+/* Fixed white ink belongs to the cover artwork's dark scrim in both host themes. */
+.album-track-row {
+  display: grid;
+  grid-template-columns: 2em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(12px / var(--album-scale));
+  width: 100%;
+  height: var(--album-track-height, calc(44px / var(--album-scale)));
+  padding: calc(8px / var(--album-scale));
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 12%);
+  text-align: left;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: calc(15px / var(--album-scale));
+  cursor: pointer;
+}
+.album-tracks__placeholder { display: flex; color: rgb(255 255 255 / 72%); font-size: calc(13px / var(--album-scale)); }
+.album-tracks__placeholder:not(button) { cursor: default; }
+.album-tracks button:hover, .album-tracks button[aria-current="true"] { background: rgb(255 255 255 / 18%); }
+.album-tracks button[aria-current="true"] { box-shadow: inset 3px 0 var(--host-accent); }
+.album-tracks button:disabled { opacity: .5; cursor: default; }
+.album-track__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.album-track__number, .album-track__time { color: rgb(255 255 255 / 72%); font-variant-numeric: tabular-nums; font-size: .9em; }
+
+.controls.album-actions[data-mode="other"] .controls__button--primary {
+  overflow: hidden;
+  width: 0;
+  min-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.controls.album-actions[data-mode="other"] .controls__button--album {
+  width: 64px;
+  height: 64px;
+}
+.controls.album-actions[data-mode="other"] .controls__button--album svg {
+  width: 30px;
+  height: 30px;
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echo.example/schemas/workshop/visualizer.schema.json",
+  "title": "ECHO Workshop visualizer preset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "schemaVersion", "id", "title", "style", "palette", "barCount", "smoothing", "sensitivity", "decay", "mirror"],
+  "properties": {
+    "type": { "const": "echo-workshop-visualizer-preset" },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 3, "maxLength": 80 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string" },
+    "style": { "enum": ["bars", "wave", "radial"] },
+    "palette": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+    },
+    "barCount": { "type": "integer", "minimum": 8, "maximum": 128 },
+    "smoothing": { "type": "number", "minimum": 0, "maximum": 1 },
+    "sensitivity": { "type": "number", "minimum": 0.25, "maximum": 4 },
+    "decay": { "type": "number", "minimum": 0, "maximum": 1 },
+    "mirror": { "type": "boolean" }
+  }
+}
