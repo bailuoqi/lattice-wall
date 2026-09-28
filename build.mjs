@@ -11,6 +11,10 @@ const reflowsPath = resolve(sourceRoot, 'panel', 'geometry', 'blockReflows.json'
 const maximumFileBytes = 512 * 1024;
 const maximumPackageBytes = 2 * 1024 * 1024;
 const panelScriptTargetBytes = 200 * 1024;
+const licenseBanner = `/*! Lattice Wall | Copyright (c) 2026 Lattice Wall contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See LICENSE and NOTICE.md in the Workshop item for license and source information.
+ */`;
 
 try {
   await access(reflowsPath);
@@ -28,7 +32,8 @@ await build({
   target: ['chrome120'],
   minify: true,
   treeShaking: true,
-  legalComments: 'none',
+  legalComments: 'inline',
+  banner: { js: licenseBanner },
   sourcemap: false,
   charset: 'utf8',
   logLevel: 'warning',
@@ -37,12 +42,18 @@ await build({
 // Stylesheets are concatenated in filename order; use numeric prefixes (00-base.css, 10-wall.css, ...) to control cascade order.
 const styleFiles = (await readdir(stylesRoot)).filter((name) => name.endsWith('.css')).sort();
 if (styleFiles.length === 0) throw new Error('source/styles has no .css files');
-const css = [];
+const css = [licenseBanner + '\n'];
 for (const name of styleFiles) {
   const content = await readFile(resolve(stylesRoot, name), 'utf8');
   css.push(`/* ${name} */\n${content.trim()}\n`);
 }
 await writeFile(resolve(srcRoot, 'panel.css'), css.join('\n'), 'utf8');
+
+// Ship the license and source notice with the Workshop item, outside the sandbox assets.
+for (const name of ['LICENSE', 'NOTICE.md']) {
+  const text = await readFile(resolve(root, name), 'utf8');
+  await writeFile(resolve(root, 'content', name), text.replace(/\r\n?/gu, '\n'), 'utf8');
+}
 
 let total = 0;
 const report = [];

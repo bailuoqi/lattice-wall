@@ -1,15 +1,16 @@
 # Asset sources
 
-## Design inspiration
+## Project license and reference
+
+Lattice Wall is licensed under AGPL-3.0-only. See `LICENSE` and `NOTICE.md`.
 
 - Project: folia-major — https://github.com/chthollyphile/folia-major
 - License: AGPL-3.0
-- Relationship: inspiration only. Lattice Wall reimplements the idea of an
-  infinite album wall with in-place expansion from scratch. No source code,
-  block templates, reflow ("yield") tables, CSS values or media were copied.
-  The five block templates in `source/panel/geometry/blockTemplates.ts` are
-  original designs, and `blockReflows.json` is produced by this project's own
-  solver (`scripts/generate-reflows.mjs`).
+- Relationship: reference for the album-wall design. The previous claims of
+  inspiration only, clean-room implementation, original template designs and
+  no copying of code, data or stylesheet values have been withdrawn.
+- Local build inputs: `source/panel/geometry/blockTemplates.ts` contains the
+  five templates; `scripts/generate-reflows.mjs` generates `blockReflows.json`.
 
 ## Packaged assets
 
@@ -34,3 +35,8 @@ The plug-in packages no fonts, images, audio or video. Visuals come from:
 
 Runtime: none. Development only: `esbuild` (MIT) and `typescript`
 (Apache-2.0), neither of which ships in the package.
+
+The vendored ECHO Workshop SDK under `.echo-sdk/` comes from
+https://github.com/Moekotori/echo-workshop-sdk and retains its MIT license
+(copyright 2026 Moekotori); see `.echo-sdk/LICENSE`. The snapshot and its local
+differences are documented in the README's Workshop SDK baseline section.

@@ -5,8 +5,8 @@
   "contentDirectory": "content",
   "previewFile": "preview.png",
   "visibility": "public",
-  "description": "Lattice brings library track and album collage walls to ECHO. Browse and search tracks or albums, expand album track lists, play a song or an album, and enjoy synchronized lyrics in immersive panels.",
-  "changeNote": "1.1.0: renamed to Lattice Music Wall; added a paginated library album wall with track lists and playback; reduced card recycling work during panning.",
+  "description": "Lattice brings library track and album collage walls to ECHO. Browse and search tracks or albums, expand album track lists, play a song or an album, and enjoy synchronized lyrics in immersive panels. Licensed under AGPL-3.0-only. Source: https://github.com/bailuoqi/lattice-wall",
+  "changeNote": "Licensing update: AGPL-3.0-only; includes the full license and source notice; withdraws the previous clean-room claims.",
   "tags": [
     "Sandboxed Plugin"
   ]

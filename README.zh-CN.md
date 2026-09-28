@@ -32,15 +32,24 @@
 
 每次改动后要重新导入本地包，以更新并重新批准 `library:read`。
 
-设计灵感来自 [folia-major](https://github.com/chthollyphile/folia-major) 的专辑墙（AGPL-3.0）。
-本项目是干净重写 —— 没有复制任何代码、模板数据、让位表或样式数值，详见 `ASSET_SOURCES.md`。
+## 许可证与源码
+
+Lattice Wall 采用 **GNU Affero 通用公共许可证第 3 版，仅限该版本（`AGPL-3.0-only`）**。
+完整条款见 [LICENSE](./LICENSE)，版权、源码及第三方声明见 [NOTICE.md](./NOTICE.md)。
+工坊包随附这两份文件，许可证元数据提供[源码仓库地址](https://github.com/bailuoqi/lattice-wall)。
+分发包对应的源码和构建说明必须与所分发版本一致。
+
+本项目参考了 [folia-major](https://github.com/chthollyphile/folia-major) 的专辑墙（AGPL-3.0）。
+撤回此前关于 clean-room／干净重写以及未复制代码、数据和样式的声明，详见
+[ASSET_SOURCES.md](./ASSET_SOURCES.md)。内置 ECHO Workshop SDK 保留其自身的
+[MIT 许可证](./.echo-sdk/LICENSE)。
 
 ## 曲库墙特性
 
 - 一面墙最多铺 800 首曲库歌曲，无限平铺：任意方向拖动、滚轮 / 触控板滚动、惯性、卡片间键盘导航。
   超过 800 首则翻页。封面相同的歌曲会被打散到墙面各处，而不是相邻摆放。
   `Ctrl + Space` 打开功能面板做搜索与翻页。
-- 12×8 的 block 由五套原创模板经哈希镜像构成，相邻 block 永不重复；
+- 12×8 的 block 由五套模板经哈希镜像构成，相邻 block 永不重复；
   预生成的让位表在某张卡展开为 6×6 时，把同一 block 内其余十一张移开。
 - 展开卡：标题、艺术家、曲库标记、上一曲 / 播放暂停 / 下一曲；非当前曲另有一个播放按钮。
   进度条与时间只出现在正在播放的那张卡上。
@@ -70,7 +79,8 @@ npm run dev          # 带假宿主的本地浏览器环境（见下）
 
 `npm run build` 把 `source/panel/main.ts` 与 `source/panel/albums/main.ts` 分别打包成
 `src/panel.js` 和 `src/albums.js`（IIFE、压缩），并按文件名顺序把 `source/styles/*.css`
-拼接成 `src/panel.css`。`sync` 把 `src/` 打包进 `content/community.echo`，
+拼接成 `src/panel.css`，并把 `LICENSE` 与 `NOTICE.md` 复制到 `content/`。
+`sync` 把 `src/` 打包进 `content/community.echo`，
 并刷新 `content/echo.workshop.json` 里的哈希。
 
 Workshop SDK 自带的 `dev` 命令不渲染插件面板，所以 `npm run dev` 启动

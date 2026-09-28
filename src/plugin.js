@@ -1,4 +1,8 @@
 /// <reference path="../.echo-sdk/echo-workshop-plugin.d.ts" />
+/*! Lattice Wall | Copyright (c) 2026 Lattice Wall contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See LICENSE and NOTICE.md in the Workshop item for license and source information.
+ */
 'use strict';
 
 // Lattice Wall lives entirely in its panel. The background runtime only exposes a

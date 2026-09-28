@@ -45,9 +45,19 @@ keep a locate button.
 
 Re-import the local package to update and approve `library:read`.
 
-Design inspiration: the album wall of [folia-major](https://github.com/chthollyphile/folia-major)
-(AGPL-3.0). This project is a clean-room rewrite — no code, template data,
-reflow tables or stylesheet values were copied. See `ASSET_SOURCES.md`.
+## License and source
+
+Lattice Wall is licensed under the **GNU Affero General Public License, version 3
+only (`AGPL-3.0-only`)**. See [LICENSE](./LICENSE) for the full terms and
+[NOTICE.md](./NOTICE.md) for copyright, source and third-party notices.
+The Workshop package includes both files; its license metadata links to the
+[source repository](https://github.com/bailuoqi/lattice-wall). Source and build
+instructions for a distributed package must match that package's version.
+
+The album wall of [folia-major](https://github.com/chthollyphile/folia-major)
+(AGPL-3.0) is an acknowledged reference. The previous clean-room and no-copying
+claims have been withdrawn. See [ASSET_SOURCES.md](./ASSET_SOURCES.md).
+The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
 
 ## Library wall features
 
@@ -56,7 +66,7 @@ reflow tables or stylesheet values were copied. See `ASSET_SOURCES.md`.
   cards. Libraries larger than 800 page. Tracks that share a cover are spread
   across the wall instead of sitting next to each other. `Ctrl + Space`
   opens the function panel to search and turn pages.
-- 12×8 blocks built from five original templates with hashed mirroring so
+- 12×8 blocks built from five templates with hashed mirroring so
   adjacent blocks never repeat; a pre-solved reflow table moves the other eleven
   cards aside when one expands to 6×6.
 - Expanded card: title, artist, library badge, previous / play-pause / next;
@@ -95,7 +105,8 @@ npm run dev          # local browser harness with a mock host (see below)
 
 `npm run build` bundles `source/panel/main.ts` and `source/panel/albums/main.ts` into
 `src/panel.js` and `src/albums.js` (IIFE,
-minified) and concatenates `source/styles/*.css` into `src/panel.css`. `sync`
+minified) and concatenates `source/styles/*.css` into `src/panel.css`. It also
+copies `LICENSE` and `NOTICE.md` into `content/`. `sync`
 packages `src/` into `content/community.echo` and refreshes hashes in
 `content/echo.workshop.json`.
 
