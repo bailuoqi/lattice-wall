@@ -15,8 +15,8 @@
   "files": [
     {
       "path": "community.echo",
-      "size": 211706,
-      "sha256": "e3363d64cf5911da86c7fceb9b185549c3357e26a51271aab2b9ce5cc2046a9f"
+      "size": 256755,
+      "sha256": "13d0d1d825789b1dd80d3ee2f89a1cdbcbe2cb81294e349885e919bd2780bd77"
     },
     {
       "path": "LICENSE",
@@ -25,8 +25,8 @@
     },
     {
       "path": "NOTICE.md",
-      "size": 1640,
-      "sha256": "7eef88970d474cbf83c2de62b49919b580f418d36ecfdd6337b7cbbfb3e37b00"
+      "size": 1952,
+      "sha256": "ed111195977901fd1b31e761fcee0e1669f9401957cd11e122cd6fda034c0e9b"
     }
   ],
   "license": {

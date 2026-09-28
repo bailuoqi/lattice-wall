@@ -17,6 +17,9 @@
   --host-player: #171a22;
   --host-accent-2: color-mix(in srgb, var(--host-accent) 45%, var(--host-text));
   --shade-color: #000000;
+  --wall-background: #000000;
+  --wall-text: #ffffff;
+  --wall-muted: rgb(255 255 255 / 72%);
 }
 
 html[data-color-scheme="light"] {
@@ -39,7 +42,7 @@ body {
 body {
   font-family: var(--ui-font, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif);
   color: var(--host-text);
-  background: var(--host-app-bg);
+  background: var(--wall-background);
   -webkit-font-smoothing: antialiased;
 }
 

@@ -83,6 +83,17 @@ The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
   (neutral black or an explicit custom colour and intensity), cell size, lyrics and
   translation; `L` / `V` / `T` toggle lights-out / vignette / tint from the
   keyboard and write back to the host settings.
+- The function panel has Browse, Playback, Appearance and Lighting tabs, with a
+  configurable panel-local shortcut (default `Ctrl + Space`). Covers can always
+  show their titles; tint supports uniform, diagonal and vertical modes.
+- Album cards share the title/lyrics transition with track cards. Separate buttons
+  switch between the scrolling track list and the playing album's lyrics, or hide
+  both while keeping playback controls available. The canvas stays black in both
+  host themes, with 4 px gaps between cards.
+
+These UI refinements were adapted from ECHOSteam's Lattice Wall component using
+this plug-in's existing Workshop APIs. Desktop integration and host-only playback
+speed controls are not included.
 
 ## Privacy and host boundaries
 

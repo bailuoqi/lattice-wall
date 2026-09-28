@@ -1,33 +1,40 @@
+import { DEFAULT_PANEL_SHORTCUT, normalizePanelShortcut } from './controlPanelShortcut.ts';
 import type { CellSizeId, LatticeSettings, LightingMode, Metrics, SettingValues, WallVisualOptions } from '../types.ts';
 
 /** Runtime key → manifest setting id (`contributes.settings[].id`, kebab-case). */
 export const SETTING_IDS: Record<keyof LatticeSettings, string> = {
+  controlPanelShortcut: 'control-panel-shortcut',
   immersive: 'immersive',
   autoFocus: 'auto-focus',
   lightingMode: 'lighting-mode',
   vignette: 'vignette',
   lightsOut: 'lights-out',
   posterTint: 'poster-tint',
+  posterTintGradient: 'poster-tint-gradient',
   posterTintCustom: 'poster-tint-custom',
   posterTintColor: 'poster-tint-color',
   posterTintIntensity: 'poster-tint-intensity',
   cellSize: 'cell-size',
+  showTitles: 'show-titles',
   showLyrics: 'show-lyrics',
   showTranslation: 'show-translation',
   uiFont: 'ui-font',
 };
 
 export const DEFAULT_SETTINGS: LatticeSettings = {
+  controlPanelShortcut: DEFAULT_PANEL_SHORTCUT,
   immersive: true,
   autoFocus: true,
   lightingMode: 'spotlight',
   vignette: true,
   lightsOut: false,
   posterTint: true,
+  posterTintGradient: 'none',
   posterTintCustom: false,
   posterTintColor: '#000000',
   posterTintIntensity: 0.5,
   cellSize: 'M',
+  showTitles: false,
   showLyrics: true,
   showTranslation: true,
   uiFont: '',
@@ -37,7 +44,7 @@ export const DEFAULT_SETTINGS: LatticeSettings = {
 export const FALLBACK_TINT = '#000000';
 
 const CELL_SIDES: Record<CellSizeId, number> = { S: 104, M: 128, L: 152 };
-const CELL_GAP = 8;
+const CELL_GAP = 4;
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const FONT_UNSAFE = /url\s*\(|expression\s*\(|[@;{}\\]|<\/?/i;
@@ -66,20 +73,25 @@ export function resolveSettings(values: SettingValues): LatticeSettings {
   const intensity = read('posterTintIntensity');
   const cellSize = read('cellSize');
   const lighting = read('lightingMode');
+  const tintGradient = read('posterTintGradient');
 
   return {
+    controlPanelShortcut: normalizePanelShortcut(read('controlPanelShortcut')) ?? DEFAULT_PANEL_SHORTCUT,
     immersive: bool(read('immersive'), DEFAULT_SETTINGS.immersive),
     autoFocus: bool(read('autoFocus'), DEFAULT_SETTINGS.autoFocus),
     lightingMode: isLightingMode(lighting) ? lighting : DEFAULT_SETTINGS.lightingMode,
     vignette: bool(read('vignette'), DEFAULT_SETTINGS.vignette),
     lightsOut: bool(read('lightsOut'), DEFAULT_SETTINGS.lightsOut),
     posterTint: bool(read('posterTint'), DEFAULT_SETTINGS.posterTint),
+    posterTintGradient: tintGradient === 'diagonal' || tintGradient === 'vertical'
+      ? tintGradient : DEFAULT_SETTINGS.posterTintGradient,
     posterTintCustom: bool(read('posterTintCustom'), DEFAULT_SETTINGS.posterTintCustom),
     posterTintColor: typeof color === 'string' && HEX_COLOR.test(color) ? color.toLowerCase() : DEFAULT_SETTINGS.posterTintColor,
     posterTintIntensity: typeof intensity === 'number' && Number.isFinite(intensity)
       ? Math.min(1, Math.max(0, intensity))
       : DEFAULT_SETTINGS.posterTintIntensity,
     cellSize: isCellSize(cellSize) ? cellSize : DEFAULT_SETTINGS.cellSize,
+    showTitles: bool(read('showTitles'), DEFAULT_SETTINGS.showTitles),
     showLyrics: bool(read('showLyrics'), DEFAULT_SETTINGS.showLyrics),
     showTranslation: bool(read('showTranslation'), DEFAULT_SETTINGS.showTranslation),
     uiFont: sanitizeUiFont(read('uiFont')),
@@ -127,6 +139,7 @@ export function wallVisualsFromSettings(settings: LatticeSettings, reducedMotion
     lightsOut: daytime ? false : settings.lightsOut,
     vignette: daytime ? false : settings.vignette,
     tint: daytime ? false : settings.posterTint,
+    tintGradient: settings.posterTintGradient,
     tintColor: resolveTintColor(settings),
     tintIntensity: daytime ? 0 : settings.posterTintIntensity,
     reducedMotion,
@@ -142,6 +155,7 @@ export function applyUiFont(font: string): void {
 
 /** Lighting dataset, shade colour token, and UI font. Call before `wall.setVisualOptions`. */
 export function applyAppearance(settings: LatticeSettings): void {
+  document.body.dataset.showTitles = String(settings.showTitles);
   document.body.dataset.lighting = settings.lightingMode;
   document.body.dataset.vignette = String(settings.lightingMode !== 'daytime' && settings.vignette);
   document.body.style.setProperty('--shade-color', resolveTintColor(settings));

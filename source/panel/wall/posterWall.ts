@@ -729,6 +729,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     setVisualOptions(options) {
       world.dataset.lightsOut = String(options.lightsOut);
       world.dataset.tint = String(options.tint);
+      world.dataset.tintGradient = options.tintGradient;
       world.dataset.reducedMotion = String(options.reducedMotion);
       world.style.setProperty('--tint-color', options.tintColor);
       world.style.setProperty('--tint-alpha', String(Math.min(0.85, Math.max(0, options.tintIntensity))));

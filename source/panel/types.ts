@@ -290,20 +290,24 @@ export type HostBridge = {
 
 export type CellSizeId = 'S' | 'M' | 'L';
 export type LightingMode = 'spotlight' | 'daytime';
+export type TintGradient = 'none' | 'diagonal' | 'vertical';
 
 export type LatticeSettings = {
+  controlPanelShortcut: string;
   immersive: boolean;
   autoFocus: boolean;
   lightingMode: LightingMode;
   vignette: boolean;
   lightsOut: boolean;
   posterTint: boolean;
+  posterTintGradient: TintGradient;
   posterTintCustom: boolean;
   /** `#rrggbb` */
   posterTintColor: string;
   /** 0..1 */
   posterTintIntensity: number;
   cellSize: CellSizeId;
+  showTitles: boolean;
   showLyrics: boolean;
   showTranslation: boolean;
   /** Sanitized CSS font-family stack; empty keeps the system stack. */
@@ -355,6 +359,7 @@ export type WallVisualOptions = {
   lightsOut: boolean;
   vignette: boolean;
   tint: boolean;
+  tintGradient: TintGradient;
   /** Resolved tint colour (`#rrggbb`), black unless explicitly customized. */
   tintColor: string;
   tintIntensity: number;

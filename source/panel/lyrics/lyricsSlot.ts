@@ -11,10 +11,14 @@ export function resolveLyricsOpenHeight(input: {
   rowHeights: number[];
   gap: number;
   expectNext: boolean;
+  currentVisible?: boolean;
   estimatedCurrent: number;
   estimatedNext: number;
 }): number {
   if (!(input.cap > 1)) return 0;
+  // Before the first timestamp only the upcoming preview exists. Reserving a current row
+  // here lifts the title over an empty line (and a one-line timeline would otherwise get 0).
+  if (input.currentVisible === false) return Math.min(Math.max(0, input.rowHeights[1] ?? 0), input.cap);
   const currentH = input.rowHeights[0] ?? 0;
   if (!input.expectNext) return Math.min(Math.max(0, currentH), input.cap);
   const measuredRows = input.rowHeights.filter((height) => height > 0);
@@ -34,10 +38,10 @@ export function estimateLyricsLineHeight(row: HTMLElement | null, fallback: numb
   return Math.max(font, Number.isFinite(line) ? line : 0, Number.isFinite(min) ? min : 0, fallback);
 }
 
-export function measureLyricsOpenHeight(card: HTMLElement, slot: HTMLElement, expectNext: boolean): number {
+export function measureLyricsOpenHeight(card: HTMLElement, slot: HTMLElement, expectNext: boolean, view?: HTMLElement): number {
   const cap = card.offsetHeight * 0.42;
   if (cap <= 1) return 0;
-  const lyrics = slot.firstElementChild instanceof HTMLElement ? slot.firstElementChild : null;
+  const lyrics = view ?? (slot.firstElementChild instanceof HTMLElement ? slot.firstElementChild : null);
   const prevSlotMax = slot.style.maxHeight;
   const prevSlotHeight = slot.style.height;
   const prevLyricsHeight = lyrics?.style.height ?? '';
@@ -57,12 +61,14 @@ export function measureLyricsOpenHeight(card: HTMLElement, slot: HTMLElement, ex
   const rowHeight = (row: HTMLElement): number => row.hidden ? 0 : Number.parseFloat(getComputedStyle(row).height) || 0;
   if (current) rowHeights.push(rowHeight(current));
   if (next) rowHeights.push(rowHeight(next));
-  const height = resolveLyricsOpenHeight({
+  const scrollHeight = Math.max(slot.scrollHeight, lyrics?.scrollHeight ?? 0);
+  const height = !current && !next ? Math.min(cap, scrollHeight) : resolveLyricsOpenHeight({
     cap,
-    scrollHeight: Math.max(slot.scrollHeight, lyrics?.scrollHeight ?? 0),
+    scrollHeight,
     rowHeights,
     gap,
     expectNext,
+    currentVisible: current !== null && !current.hidden,
     estimatedCurrent: estimateLyricsLineHeight(current, 40),
     estimatedNext: estimateLyricsLineHeight(next, 28),
   });

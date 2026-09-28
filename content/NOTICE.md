@@ -26,6 +26,12 @@ substitute for that source.
 
 ## Acknowledgements and third-party components
 
+UI refinements adapted from ECHOSteam's Lattice Wall component:
+Copyright (c) 2026 Moekotori and ECHO contributors, AGPL-3.0-only.
+Source: https://github.com/Moekotori/ECHOSteam
+Revision: baf53012d3a04be660775cd4c4acceb7ea5ba490.
+See ASSET_SOURCES.md for the adapted presentation scope and integration changes.
+
 The album wall of folia-major (AGPL-3.0) is an acknowledged reference:
 https://github.com/chthollyphile/folia-major
 

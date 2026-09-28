@@ -58,6 +58,8 @@ async function start(): Promise<void> {
   };
   const details = createAlbumDetails(echo, {
     playAlbum: () => undefined,
+    getLyrics: (id) => bridge.getLyrics(id),
+    readClock: () => clock.read(now()),
     play: () => void bridge.play(),
     pause: () => void bridge.pause(),
     togglePlay,
@@ -184,6 +186,7 @@ async function start(): Promise<void> {
   const visuals = () => {
     applyAppearance(settings);
     wall.setVisualOptions(wallVisualsFromSettings(settings, context.reducedMotion));
+    details.setLyricsOptions({ showTranslation: settings.showTranslation, reducedMotion: context.reducedMotion });
   };
   const commitSettings = (previous: LatticeSettings, persist: Partial<LatticeSettings> | null): void => {
     visuals();
@@ -231,7 +234,7 @@ async function start(): Promise<void> {
       overlay.show(ready ? 'ready' : 'empty');
       if (!ready) {
         state.querySelector('h2')!.textContent = search ? '没有找到专辑' : '曲库中还没有专辑';
-        state.querySelector('p')!.textContent = search ? '按 Ctrl + Space 修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，按 Ctrl + Space 打开功能面板并刷新。';
+        state.querySelector('p')!.textContent = search ? '在功能面板中修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，打开功能面板并刷新。';
         return;
       }
       rebuild();
@@ -250,7 +253,7 @@ async function start(): Promise<void> {
       if (disposed) return;
       browser.error(); overlay.show('empty');
       state.querySelector('h2')!.textContent = '暂时无法读取专辑';
-      state.querySelector('p')!.textContent = '按 Ctrl + Space 打开功能面板并刷新重试；如尚未授权，请在 Workshop → 已安装 中确认读取曲库权限。';
+      state.querySelector('p')!.textContent = '打开功能面板并刷新重试；如尚未授权，请在 Workshop → 已安装 中确认读取曲库权限。';
     }
   }
   const browser = createControlPanel(root, {
@@ -352,7 +355,7 @@ async function start(): Promise<void> {
     }),
   ];
   stop.push(echo.events.on('library:changed', () => {
-    overlay.setNotice('曲库已更新，按 Ctrl + Space 打开功能面板并刷新');
+    overlay.setNotice('曲库已更新，打开功能面板并刷新');
   }));
   const resize = new ResizeObserver(entries => {
     const rect = entries[0]?.contentRect;

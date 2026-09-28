@@ -42,7 +42,7 @@ export const createStateOverlay = (container: HTMLElement, host: HTMLElement): S
         return;
       }
       if (state === 'empty') {
-        container.append(...message('曲库中还没有歌曲', '在 ECHO 中导入音乐后，按 Ctrl + Space 打开功能面板并刷新。'));
+        container.append(...message('曲库中还没有歌曲', '在 ECHO 中导入音乐后，打开功能面板并刷新。'));
         return;
       }
       const missing = detail?.missing ?? [];

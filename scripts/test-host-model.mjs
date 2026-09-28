@@ -298,6 +298,7 @@ test('resolveSettings: reads manifest ids and validates ranges', () => {
     [SETTING_IDS.showTranslation]: false,
   });
   assert.deepEqual(resolved, {
+    controlPanelShortcut: 'Ctrl+Space', showTitles: false, posterTintGradient: 'none',
     immersive: false, autoFocus: false, lightingMode: 'spotlight', vignette: false, lightsOut: true, posterTint: false,
     posterTintCustom: true, posterTintColor: '#abcdef', posterTintIntensity: 0.75, cellSize: 'L', showLyrics: false,
     showTranslation: false, uiFont: '',
@@ -311,8 +312,8 @@ test('resolveSettings: reads manifest ids and validates ranges', () => {
 
 test('SETTING_IDS covers every manifest setting id exactly once', () => {
   assert.deepEqual(Object.values(SETTING_IDS).sort(), [
-    'auto-focus', 'cell-size', 'immersive', 'lighting-mode', 'lights-out', 'poster-tint', 'poster-tint-color',
-    'poster-tint-custom', 'poster-tint-intensity', 'show-lyrics', 'show-translation', 'ui-font', 'vignette',
+    'auto-focus', 'cell-size', 'control-panel-shortcut', 'immersive', 'lighting-mode', 'lights-out', 'poster-tint', 'poster-tint-color',
+    'poster-tint-custom', 'poster-tint-gradient', 'poster-tint-intensity', 'show-lyrics', 'show-titles', 'show-translation', 'ui-font', 'vignette',
   ]);
 });
 
@@ -333,7 +334,7 @@ test('sanitizeUiFont rejects injection and keeps a short stack', () => {
 test('wallVisualsFromSettings: daytime turns off shade, tint and vignette', () => {
   const daytime = wallVisualsFromSettings({ ...DEFAULT_SETTINGS, lightingMode: 'daytime', lightsOut: true }, false);
   assert.deepEqual(daytime, {
-    lightsOut: false, vignette: false, tint: false, tintColor: '#000000', tintIntensity: 0, reducedMotion: false,
+    lightsOut: false, vignette: false, tint: false, tintGradient: 'none', tintColor: '#000000', tintIntensity: 0, reducedMotion: false,
   });
   const spotlight = wallVisualsFromSettings({ ...DEFAULT_SETTINGS, lightsOut: true }, true);
   assert.equal(spotlight.lightsOut, true);
@@ -349,10 +350,10 @@ test('settingEntries maps runtime keys to manifest ids', () => {
   ]);
 });
 
-test('cellMetricsFor: S/M/L sides with an 8 px gap', () => {
-  assert.deepEqual(cellMetricsFor('S'), { cell: 104, gap: 8 });
-  assert.deepEqual(cellMetricsFor('M'), { cell: 128, gap: 8 });
-  assert.deepEqual(cellMetricsFor('L'), { cell: 152, gap: 8 });
+test('cellMetricsFor: S/M/L sides with a 4 px gap', () => {
+  assert.deepEqual(cellMetricsFor('S'), { cell: 104, gap: 4 });
+  assert.deepEqual(cellMetricsFor('M'), { cell: 128, gap: 4 });
+  assert.deepEqual(cellMetricsFor('L'), { cell: 152, gap: 4 });
 });
 
 test('wallOverviewScale: narrower viewports pull the camera further back', () => {

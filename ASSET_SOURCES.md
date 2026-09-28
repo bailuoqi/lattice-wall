@@ -12,6 +12,16 @@ Lattice Wall is licensed under AGPL-3.0-only. See `LICENSE` and `NOTICE.md`.
 - Local build inputs: `source/panel/geometry/blockTemplates.ts` contains the
   five templates; `scripts/generate-reflows.mjs` generates `blockReflows.json`.
 
+## UI refinements
+
+The tabbed settings, cover captions/shading and album content presentation were
+adapted from the Lattice Wall component in https://github.com/Moekotori/ECHOSteam
+at revision `baf53012d3a04be660775cd4c4acceb7ea5ba490` (AGPL-3.0-only;
+copyright 2026 Moekotori and ECHO contributors). Styles use this plug-in's local
+tokens, and UI actions use its existing public Workshop bridge. ECHOSteam's
+React shell, desktop integration, private host APIs and global shortcut utilities
+are not included. The panel shortcut handler is implemented locally in the sandbox.
+
 ## Packaged assets
 
 The plug-in packages no fonts, images, audio or video. Visuals come from:
@@ -20,8 +30,6 @@ The plug-in packages no fonts, images, audio or video. Visuals come from:
   procedurally generated two-colour gradient when a track has no cover.
 - Icons authored as inline SVG paths inside `source/panel/wall/controls.ts`
   and `source/panel/albums/albumActions.ts`.
-- A background noise texture generated as an inline SVG `feTurbulence` data URI
-  in `source/styles/10-wall.css`.
 - System font stack (`system-ui`, PingFang SC, Microsoft YaHei, ...).
 
 ## Workshop preview

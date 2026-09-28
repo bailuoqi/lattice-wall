@@ -9,13 +9,15 @@ const ICONS = {
   next: `${SVG_OPEN}<path d="M15.6 5H18v14h-2.4zM6 5.5v13l8.6-6.5z"/></svg>`,
   shuffle: `${SVG_OPEN}<path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zm3.91-5.17 2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>`,
   repeatOne: `${SVG_OPEN}<path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></svg>`,
+  tracks: `${SVG_OPEN}<path d="M4 5h2v2H4zm4 0h12v2H8zM4 11h2v2H4zm4 0h12v2H8zM4 17h2v2H4zm4 0h12v2H8z"/></svg>`,
+  lyrics: `${SVG_OPEN}<path d="M4 4h16v12H8l-4 4V4zm3 3v2h10V7H7zm0 4v2h7v-2H7z"/></svg>`,
 } as const;
 
 const TOGGLE_MARKUP =
   `<span class="controls__glyph" data-glyph="play">${ICONS.play}</span>` +
   `<span class="controls__glyph" data-glyph="pause">${ICONS.pause}</span>`;
 
-type Action = 'previous' | 'next' | 'primary' | 'album' | 'shuffle' | 'repeatOne';
+type Action = 'previous' | 'next' | 'primary' | 'album' | 'shuffle' | 'repeatOne' | 'tracks' | 'lyrics';
 
 export type AlbumActionHandlers = {
   playAlbum(): void;
@@ -33,18 +35,23 @@ function isSpaceKey(event: KeyboardEvent): boolean {
   return event.code === 'Space' || event.key === ' ';
 }
 
+function setLabel(button: HTMLButtonElement, label: string): void {
+  button.setAttribute('aria-label', label);
+  button.title = label;
+}
+
 function createButton(className: string, action: Action, label: string, markup: string): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = className;
   button.dataset.action = action;
-  button.setAttribute('aria-label', label);
+  setLabel(button, label);
   button.innerHTML = markup;
   return button;
 }
 
-/** Footer cluster: same chrome as the library wall, plus play-album instead of lyrics. */
-export function createAlbumActions(handlers: AlbumActionHandlers) {
+/** Footer cluster with playback controls and mutually exclusive content toggles. */
+export function createAlbumActions(handlers: AlbumActionHandlers, onToggleTracks: () => void, onToggleLyrics: () => void) {
   const cluster = document.createElement('div');
   cluster.className = 'controls album-actions';
   cluster.dataset.mode = 'other';
@@ -62,7 +69,14 @@ export function createAlbumActions(handlers: AlbumActionHandlers) {
   repeatOne.setAttribute('aria-pressed', 'false');
   repeatOne.dataset.on = 'false';
   const album = createButton('controls__button controls__button--album', 'album', '播放整张专辑', ICONS.album);
-  row.append(previous, primary, next, shuffle, repeatOne, album);
+  const tracksToggle = createButton('controls__button album-content-toggle album-tracks-toggle', 'tracks', '收起曲目列表',
+    ICONS.tracks);
+  const lyricsToggle = createButton('controls__button album-content-toggle album-lyrics-toggle', 'lyrics', '显示歌词',
+    ICONS.lyrics);
+  const contentToggles = document.createElement('div');
+  contentToggles.className = 'album-content-toggles';
+  contentToggles.append(lyricsToggle, tracksToggle);
+  row.append(previous, primary, next, shuffle, repeatOne, album, contentToggles);
 
   const seek = document.createElement('div');
   seek.className = 'controls__seek';
@@ -90,12 +104,15 @@ export function createAlbumActions(handlers: AlbumActionHandlers) {
   let shownState = '';
 
   const updateLabels = (): void => {
-    primary.setAttribute('aria-label', mode === 'other' || !playing ? '播放' : '暂停');
+    setLabel(primary, mode === 'other' || !playing ? '播放' : '暂停');
     const collapsed = mode === 'other';
-    for (const button of [previous, next, shuffle, repeatOne]) {
+    for (const button of [previous, primary, next, shuffle, repeatOne]) {
       button.tabIndex = collapsed ? -1 : 0;
       button.setAttribute('aria-hidden', String(collapsed));
     }
+    if (collapsed && document.activeElement === lyricsToggle) tracksToggle.focus({ preventScroll: true });
+    lyricsToggle.hidden = collapsed;
+    lyricsToggle.disabled = collapsed;
   };
   updateLabels();
 
@@ -110,6 +127,12 @@ export function createAlbumActions(handlers: AlbumActionHandlers) {
 
   const runAction = (action: string): void => {
     switch (action) {
+      case 'tracks':
+        onToggleTracks();
+        break;
+      case 'lyrics':
+        if (mode !== 'other') onToggleLyrics();
+        break;
       case 'album':
         handlers.playAlbum();
         break;
@@ -170,6 +193,8 @@ export function createAlbumActions(handlers: AlbumActionHandlers) {
 
   return {
     element: cluster,
+    tracksToggle,
+    lyricsToggle,
     playAlbum() {
       handlers.playAlbum();
     },
@@ -211,12 +236,12 @@ export function createAlbumActions(handlers: AlbumActionHandlers) {
     setShuffleEnabled(enabled: boolean) {
       shuffle.dataset.on = String(enabled);
       shuffle.setAttribute('aria-pressed', String(enabled));
-      shuffle.setAttribute('aria-label', enabled ? '关闭随机播放' : '随机播放');
+      setLabel(shuffle, enabled ? '关闭随机播放' : '随机播放');
     },
     setRepeatOne(enabled: boolean) {
       repeatOne.dataset.on = String(enabled);
       repeatOne.setAttribute('aria-pressed', String(enabled));
-      repeatOne.setAttribute('aria-label', enabled ? '关闭单曲循环' : '单曲循环');
+      setLabel(repeatOne, enabled ? '关闭单曲循环' : '单曲循环');
     },
     focusSeek() {
       if (!slider.isConnected || mode === 'other') return false;

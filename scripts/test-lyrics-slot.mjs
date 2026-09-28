@@ -3,6 +3,13 @@ import { test } from 'node:test';
 
 import { resolveLyricsOpenHeight } from '../source/panel/lyrics/lyricsSlot.ts';
 
+test('before the first timestamp only the next-line preview occupies space', () => {
+  assert.equal(resolveLyricsOpenHeight({
+    cap: 300, scrollHeight: 200, rowHeights: [0, 30], gap: 12, expectNext: false,
+    currentVisible: false, estimatedCurrent: 40, estimatedNext: 28,
+  }), 30);
+});
+
 test('resolveLyricsOpenHeight keeps a following-row reserve when the next line is still 0', () => {
   const height = resolveLyricsOpenHeight({
     cap: 300,

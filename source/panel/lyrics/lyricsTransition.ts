@@ -1,13 +1,13 @@
 import type { ExpandedContent } from '../types.ts';
 
-const DURATION = 950;
-const EASING = 'cubic-bezier(.22, 1, .36, 1)';
+export const LYRICS_TRANSITION_TIMING = { duration: 950, easing: 'cubic-bezier(.22, 1, .36, 1)' };
 
 /** One progress value owns the title's occupied height, its uniform size and the lyric slot.
  * Text keeps its line breaks while toggling; no per-frame font layout or endpoint FLIP. */
 export function createLyricsTransition() {
   let content: ExpandedContent | null = null;
   let animation: Animation | null = null;
+  let heightAnimation: Animation | null = null;
   let observer: ResizeObserver | null = null;
 
   function measureTitle(): void {
@@ -41,13 +41,34 @@ export function createLyricsTransition() {
     }
   }
 
-  function fit(next: ExpandedContent, height: number): void {
+  function fit(next: ExpandedContent, height: number, animate = false): void {
     bind(next);
-    next.root.style.setProperty('--lyrics-open-height', `${height}px`);
+    const root = next.root;
+    const target = Number.parseFloat(root.style.getPropertyValue('--lyrics-open-height'));
+    if (Math.abs(target - height) < 0.5) return;
+    const style = getComputedStyle(root);
+    const from = Number.parseFloat(style.getPropertyValue('--lyrics-open-height')) || 0;
+    const open = Number.parseFloat(style.getPropertyValue('--lyrics-open')) || 0;
+    // Retarget from the visible height, including when a seek interrupts the previous line.
+    heightAnimation?.cancel();
+    heightAnimation = null;
+    root.style.setProperty('--lyrics-open-height', `${height}px`);
+    if (!animate || open <= 0 || Math.abs(from - height) < 0.5) return;
+    const effect = root.animate(
+      [{ '--lyrics-open-height': `${from}px` }, { '--lyrics-open-height': `${height}px` }],
+      LYRICS_TRANSITION_TIMING,
+    );
+    heightAnimation = effect;
+    effect.onfinish = () => {
+      if (heightAnimation !== effect) return;
+      heightAnimation = null;
+      effect.cancel();
+    };
   }
 
   function finish(): void {
     animation?.finish();
+    heightAnimation?.finish();
   }
 
   function toggle(next: ExpandedContent, open: boolean, reduced: boolean, onFinish?: () => void): void {
@@ -65,7 +86,7 @@ export function createLyricsTransition() {
     }
     const effect = root.animate(
       [{ '--lyrics-open': String(from) }, { '--lyrics-open': String(to) }],
-      { duration: DURATION, easing: EASING },
+      LYRICS_TRANSITION_TIMING,
     );
     animation = effect;
     effect.onfinish = () => {
@@ -79,6 +100,8 @@ export function createLyricsTransition() {
   function reset(): void {
     animation?.cancel();
     animation = null;
+    heightAnimation?.cancel();
+    heightAnimation = null;
     observer?.disconnect();
     observer = null;
     if (content) {

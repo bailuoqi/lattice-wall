@@ -172,8 +172,8 @@ const start = async (): Promise<void> => {
 
   const fitLyricsSlot = (content: ExpandedContent): void => {
     const card = content.root.closest<HTMLElement>('.poster');
-    if (!card || card.dataset.lyrics !== 'true' || lyricsTransition.running) return;
-    lyricsTransition.fit(content, measureLyricsOpenHeight(card, content.lyrics, expectFollowingLyric()));
+    if (!card || card.dataset.lyrics !== 'true') return;
+    lyricsTransition.fit(content, measureLyricsOpenHeight(card, content.lyrics, expectFollowingLyric()), !context.reducedMotion);
   };
 
   const unmountLyrics = (animate = false): void => {
@@ -545,7 +545,7 @@ const start = async (): Promise<void> => {
         setState('empty');
         overlayCopy(
           search ? '没有找到歌曲' : '曲库中还没有歌曲',
-          search ? '按 Ctrl + Space 修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，按 Ctrl + Space 打开功能面板并刷新。',
+          search ? '在功能面板中修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，打开功能面板并刷新。',
         );
         return;
       }
@@ -555,7 +555,7 @@ const start = async (): Promise<void> => {
     } catch {
       browser.error();
       setState('empty');
-      overlayCopy('暂时无法读取曲库', '按 Ctrl + Space 打开功能面板并刷新重试；如尚未授权，请在 Workshop → 已安装 中确认读取曲库权限。');
+      overlayCopy('暂时无法读取曲库', '打开功能面板并刷新重试；如尚未授权，请在 Workshop → 已安装 中确认读取曲库权限。');
     }
   };
   const commitSettings = (previous: LatticeSettings, persist: Partial<LatticeSettings> | null): void => {
@@ -682,7 +682,7 @@ const start = async (): Promise<void> => {
       requestFrame();
     }),
     echo.events.on('library:changed', () => {
-      overlay.setNotice('曲库已更新，按 Ctrl + Space 打开功能面板并刷新');
+      overlay.setNotice('曲库已更新，打开功能面板并刷新');
     }),
     bridge.onContextChanged((next) => {
       const wasVisible = context.visible;

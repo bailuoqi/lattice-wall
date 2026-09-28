@@ -23,6 +23,8 @@ export function createAlbumTrackList(api: EchoWorkshopApi, onPlay: (id: string) 
   let total = 0, generation = 0, frame = 0, pending: Promise<void> | null = null;
   let firstPage = 1, lastPage = 1, previousRange = '', revision = 0;
   let initial = true;
+  let scrollIdleTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastScrollTop = 0;
   let keyboardTarget: number | null = null, keyboardDirection = 1;
 
   const schedule = () => { if (!frame && albumId) frame = requestAnimationFrame(render); };
@@ -74,7 +76,7 @@ export function createAlbumTrackList(api: EchoWorkshopApi, onPlay: (id: string) 
     frame = 0;
     if (!albumId || element.clientHeight === 0) return;
     const scale = Number.parseFloat(getComputedStyle(element).getPropertyValue('--album-scale')) || 1;
-    const rowHeight = 44 / scale;
+    const rowHeight = 48 / scale;
     element.style.setProperty('--album-track-height', `${rowHeight}px`);
     if (keyboardTarget !== null) {
       while (keyboardTarget >= 0 && keyboardTarget < total && getTrack(keyboardTarget)?.unavailable) keyboardTarget += keyboardDirection;
@@ -121,6 +123,7 @@ export function createAlbumTrackList(api: EchoWorkshopApi, onPlay: (id: string) 
         const number = document.createElement('span'); number.className = 'album-track__number';
         number.textContent = String(index + 1).padStart(2, '0');
         const title = document.createElement('span'); title.className = 'album-track__title'; title.textContent = track.title || '未知标题';
+        title.title = title.textContent;
         const time = document.createElement('span'); time.className = 'album-track__time';
         time.textContent = track.unavailable ? '不可用' : formatTime(track.durationSeconds);
         button.append(number, title, time); putRow(index, button);
@@ -151,7 +154,17 @@ export function createAlbumTrackList(api: EchoWorkshopApi, onPlay: (id: string) 
     }
   }
 
-  element.addEventListener('scroll', schedule, { passive: true, signal: abort.signal });
+  element.addEventListener('scroll', () => {
+    if (!albumId || element.scrollTop === lastScrollTop) return;
+    lastScrollTop = element.scrollTop;
+    element.dataset.scrolling = 'true';
+    clearTimeout(scrollIdleTimer);
+    scrollIdleTimer = setTimeout(() => {
+      delete element.dataset.scrolling;
+      scrollIdleTimer = undefined;
+    }, 600);
+    schedule();
+  }, { passive: true, signal: abort.signal });
   element.addEventListener('keydown', event => {
     if (event.key !== 'Tab') return;
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-index]');
@@ -179,6 +192,9 @@ export function createAlbumTrackList(api: EchoWorkshopApi, onPlay: (id: string) 
   function clear(): void {
     generation++; albumId = null; total = 0; initial = true;
     keyboardTarget = null;
+    clearTimeout(scrollIdleTimer); scrollIdleTimer = undefined;
+    lastScrollTop = 0;
+    delete element.dataset.scrolling;
     pages.clear(); failures.clear(); mounted.clear(); rows.replaceChildren(); previousRange = ''; revision++;
     top.style.height = '0px'; bottom.style.height = '0px'; element.scrollTop = 0;
     if (frame) cancelAnimationFrame(frame); frame = 0;

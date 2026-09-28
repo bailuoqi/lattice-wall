@@ -1,109 +1,202 @@
-.album-tracks :focus-visible {
-  outline: 2px solid var(--host-accent);
-  outline-offset: 2px;
+@property --album-slot-height{
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
 }
-.poster__expanded--album {
+.album-tracks :focus-visible{
+  outline: 2px solid var(--wall-text);
+  outline-offset: -2px;
+}
+.poster__expanded.poster__expanded--album{
   --album-scale: 1;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  row-gap: calc(16px / var(--album-scale));
+  display: flex;
+  flex-direction: column-reverse;
 }
-.poster__expanded--album .poster__meta {
-  order: unset;
+.poster__expanded--album::before{
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Blend into the cover instead of outlining the list as a separate card. */
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--wall-background) 72%, transparent) 20%, color-mix(in srgb, var(--wall-background) 82%, transparent));
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.poster__expanded--album:has(.album-details[data-open="true"])::before{
+  opacity: 1;
+}
+.poster__expanded.poster__expanded--album .poster__meta{
+  order: 3;
   margin-top: 0;
-  grid-row: 1;
   pointer-events: auto;
 }
-.poster__expanded--album .poster__lyrics {
-  order: unset;
-  height: auto;
+.poster__expanded.poster__expanded--album .poster__lyrics{
+  display: grid;
+  order: 2;
+  height: calc(var(--album-slot-height) * var(--lyrics-open));
   max-height: none;
   min-height: 0;
-  overflow: visible;
-  grid-row: 2;
+  overflow: hidden;
 }
-.poster__expanded--album .poster__controls {
-  order: unset;
-  grid-row: 3;
+.poster__expanded.poster__expanded--album .poster__controls{
+  order: 1;
 }
-.poster__expanded--album .poster__title {
-  font-size: clamp(28px, 5.4cqw, 52px);
-  line-height: 1.15;
-  letter-spacing: -.02em;
-  -webkit-line-clamp: 2;
+.poster__expanded.poster__expanded--album .poster__title{
+  --title-scale: calc(1 - var(--lyrics-open) * (1 - var(--title-open-scale, 1)));
+  height: calc(var(--title-natural-height) * var(--title-scale));
 }
-.poster__expanded--album .poster__artist {
-  font-size: clamp(14px, 2cqw, 20px);
+.poster__expanded.poster__expanded--album .poster__artist{
+  transform: translateZ(0);
 }
-.album-details { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.album-details[hidden],
-.album-actions[hidden] { display: none; }
-.album-details__message { margin: 0 0 calc(8px / var(--album-scale)); font-size: calc(12px / var(--album-scale)); color: rgb(255 255 255 / 75%); }
-.album-tracks {
-  --album-scroll-outset: max(0px, calc(var(--expanded-pad) - 12px / var(--album-scale)));
+.album-details,
+.album-lyrics{
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  /* Retain a stable list viewport; the outer slot owns the expansion and clipping. */
+  height: var(--lyrics-open-height, 0px);
+  min-height: 0;
+  min-width: 0;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity .22s ease, transform .22s ease, visibility 0s;
+}
+.album-details[data-open="false"],
+.album-lyrics[data-open="false"] {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(calc(10px / var(--album-scale)));
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease, visibility 0s .22s;
+}
+/* Switching content hides the outgoing panel immediately; only the incoming panel fades in.
+   A direct close still fades out, and no intermediate frame paints lyrics over track rows. */
+[data-album-view="lyrics"] .album-details,
+[data-album-view="tracks"] .album-lyrics{
+  visibility: hidden;
+  transition: none;
+}
+.album-lyrics{
+  /* During intrinsic measurement, auto height must not stretch to the hidden track list's
+     grid row. Otherwise the previous list / long lyric height keeps pushing the title up. */
+  align-self: start;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.poster__expanded--album .album-lyrics .lyrics{
+  max-height: 100%;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+}
+.album-lyrics .lyrics::-webkit-scrollbar{ display: none; }
+.album-details__message{
+  flex-shrink: 0;
+  margin: 0 0 calc(8px / var(--album-scale));
+  padding-inline: calc(12px / var(--album-scale));
+  font-size: calc(13px / var(--album-scale));
+  font-weight: 500;
+  color: var(--wall-muted);
+}
+.album-tracks{
   flex: 1;
   min-height: 0;
-  margin-right: calc(-1 * var(--album-scroll-outset));
-  padding-right: var(--album-scroll-outset);
-  overflow: auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   overflow-anchor: none;
   overscroll-behavior: contain;
   touch-action: pan-y;
   scrollbar-gutter: stable;
 }
-/* theme-color-allow: a neutral thumb floats over cover artwork without a native dark track. */
-.album-tracks::-webkit-scrollbar { width: calc(8px / var(--album-scale)); height: calc(8px / var(--album-scale)); background: transparent; }
+/* Keep the gutter stable while the thumb is hidden, so row widths never jump. */
+.album-tracks::-webkit-scrollbar{ width: calc(8px / var(--album-scale)); height: calc(8px / var(--album-scale)); background: transparent; }
 .album-tracks::-webkit-scrollbar-track,
-.album-tracks::-webkit-scrollbar-corner { background: transparent; }
-.album-tracks::-webkit-scrollbar-track { margin-block: calc(24px / var(--album-scale)); }
-.album-tracks::-webkit-scrollbar-thumb {
+.album-tracks::-webkit-scrollbar-corner{ background: transparent; }
+.album-tracks::-webkit-scrollbar-track{ margin-block: calc(48px / var(--album-scale)); }
+.album-tracks::-webkit-scrollbar-thumb{
   /* A 4px visible stroke retains an 8px drag target. Insets also shorten its travel. */
   border: calc(2px / var(--album-scale)) solid transparent;
-  background: rgb(255 255 255 / 45%);
+  background: transparent;
   background-clip: padding-box;
   border-radius: 999px;
 }
-.album-tracks::-webkit-scrollbar-thumb:hover { background-color: rgb(255 255 255 / 65%); }
-.album-tracks::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-/* Fixed white ink belongs to the cover artwork's dark scrim in both host themes. */
-.album-track-row {
+.album-tracks[data-scrolling="true"]::-webkit-scrollbar-thumb{
+  background-color: color-mix(in srgb, var(--wall-text) 45%, transparent);
+}
+.album-tracks[data-scrolling="true"]::-webkit-scrollbar-thumb:hover{
+  background-color: color-mix(in srgb, var(--wall-text) 65%, transparent);
+}
+.album-tracks::-webkit-scrollbar-button{ display: none; width: 0; height: 0; }
+/* Cover text keeps its overlay contrast in both host themes. */
+.album-track-row{
   display: grid;
-  grid-template-columns: 2em minmax(0, 1fr) auto;
+  grid-template-columns: 2.25em minmax(0, 1fr) 4.5em;
   align-items: center;
   gap: calc(12px / var(--album-scale));
   width: 100%;
-  height: var(--album-track-height, calc(44px / var(--album-scale)));
-  padding: calc(8px / var(--album-scale));
+  height: var(--album-track-height, calc(48px / var(--album-scale)));
+  padding: calc(8px / var(--album-scale)) calc(12px / var(--album-scale));
   border: 0;
-  border-bottom: 1px solid rgb(255 255 255 / 12%);
+  border-bottom: 1px solid color-mix(in srgb, var(--wall-text) 10%, transparent);
   text-align: left;
   background: transparent;
-  color: #fff;
+  color: var(--wall-text);
   font: inherit;
-  font-size: calc(15px / var(--album-scale));
+  font-size: calc(16px / var(--album-scale));
+  font-weight: 500;
+  line-height: 1.4;
   cursor: pointer;
+  transition: background-color .16s ease;
 }
-.album-tracks__placeholder { display: flex; color: rgb(255 255 255 / 72%); font-size: calc(13px / var(--album-scale)); }
+.album-tracks__placeholder{ display: flex; color: var(--wall-muted); font-size: calc(13px / var(--album-scale)); }
 .album-tracks__placeholder:not(button) { cursor: default; }
-.album-tracks button:hover, .album-tracks button[aria-current="true"] { background: rgb(255 255 255 / 18%); }
-.album-tracks button[aria-current="true"] { box-shadow: inset 3px 0 var(--host-accent); }
-.album-tracks button:disabled { opacity: .5; cursor: default; }
-.album-track__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.album-track__number, .album-track__time { color: rgb(255 255 255 / 72%); font-variant-numeric: tabular-nums; font-size: .9em; }
+.album-tracks button:not(:disabled):hover,
+.album-tracks button[aria-current="true"] { background: color-mix(in srgb, var(--wall-text) 6%, transparent); }
+.album-tracks button[aria-current="true"] .album-track__title{ font-weight: 600; }
+.album-tracks button[aria-current="true"] .album-track__number{ color: var(--wall-text); }
+.album-tracks button:disabled{ color: var(--wall-muted); cursor: default; }
+.album-track__title{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.album-track__number,
+.album-track__time{ color: color-mix(in srgb, var(--wall-text) 82%, transparent); font-variant-numeric: tabular-nums; font-size: .875em; white-space: nowrap; }
+.album-track__time{ text-align: right; }
 
-.controls.album-actions[data-mode="other"] .controls__button--primary {
+.album-content-toggles{
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  gap: 8px;
+}
+.album-actions .controls__button--album,
+.album-actions .album-content-toggle{
+  width: 64px;
+  height: 64px;
+}
+.album-actions .album-content-toggle{
+  color: var(--wall-text);
+  transition: color .22s ease, opacity .15s ease, transform .15s ease;
+}
+.album-actions .controls__button--album > svg,
+.album-actions .album-content-toggle > svg{ width: 30px; height: 30px; }
+.album-actions .album-content-toggle[hidden] { display: none; }
+.album-content-toggle[aria-expanded="false"] { color: var(--wall-muted); }
+.album-content-toggle:disabled{ opacity: .35; cursor: default; }
+
+body[data-reduced-motion="true"] .album-details,
+body[data-reduced-motion="true"] .poster__expanded--album::before,
+body[data-reduced-motion="true"] .album-lyrics,
+body[data-reduced-motion="true"] .album-track-row,
+body[data-reduced-motion="true"] .album-actions .album-content-toggle{
+  transition: none;
+}
+
+.controls.album-actions[data-mode="other"] .controls__button--primary{
   overflow: hidden;
   width: 0;
   min-width: 0;
   margin-left: 0;
   opacity: 0;
   pointer-events: none;
-}
-.controls.album-actions[data-mode="other"] .controls__button--album {
-  width: 64px;
-  height: 64px;
-}
-.controls.album-actions[data-mode="other"] .controls__button--album svg {
-  width: 30px;
-  height: 30px;
 }

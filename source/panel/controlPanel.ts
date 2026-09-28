@@ -1,5 +1,8 @@
 import type { LatticeSettings } from './types.ts';
 import { createControlPanelSettings } from './controlPanelSettings.ts';
+import { createControlPanelTabs } from './controlPanelTabs.ts';
+import { createControlPanelShortcut } from './controlPanelShortcut.ts';
+import { matchesPanelShortcut, panelShortcutAria } from './host/controlPanelShortcut.ts';
 
 export type ControlPanelWall = 'library' | 'albums';
 
@@ -31,11 +34,11 @@ const el = <K extends keyof HTMLElementTagNameMap>(
 
 const focusables = (root: HTMLElement): HTMLElement[] =>
   [...root.querySelectorAll<HTMLButtonElement | HTMLInputElement | HTMLSelectElement>('button, input, select')].filter(
-    (node) => !node.disabled && !node.hidden && !node.closest('[hidden]') && node.getAttribute('aria-hidden') !== 'true',
+    (node) => node.tabIndex >= 0 && !node.disabled && !node.hidden && !node.closest('[hidden]') && node.getAttribute('aria-hidden') !== 'true',
   );
 
 /**
- * Ctrl+Space function panel: wall switch, per-wall search + paging, and Folia-style Lattice settings.
+ * Function panel: wall switch, per-wall search + paging, and Folia-style Lattice settings.
  * Owns no library data.
  */
 export function createControlPanel(
@@ -54,20 +57,24 @@ export function createControlPanel(
   const { signal } = abort;
   const dialog = el('dialog', 'control-panel');
   dialog.setAttribute('aria-labelledby', 'control-panel-title');
-  dialog.setAttribute('aria-keyshortcuts', 'Control+Space');
+  let panelShortcut = options.settings.controlPanelShortcut;
 
   const form = el('form', 'control-panel__form');
   const header = el('div', 'control-panel__header');
+  const heading = el('div');
   const title = el('h2', undefined, '功能面板');
   title.id = 'control-panel-title';
-  const dismiss = el('button', undefined, 'Esc');
+  heading.append(title, el('p', 'control-panel__hint', '拼贴墙的浏览、播放与外观'));
+  const dismiss = el('button', 'control-panel__dismiss', 'Esc');
   dismiss.type = 'button';
   dismiss.setAttribute('aria-label', '关闭功能面板');
-  header.append(title, dismiss);
+  header.append(heading, dismiss);
 
-  const wallSection = el('section', 'control-panel__section');
-  wallSection.append(el('h3', 'control-panel__label', '拼贴墙'));
-  const wallRow = el('div', 'control-panel__options');
+  const wallSection = el('section', 'control-panel__section control-panel__browse');
+  wallSection.append(el('h3', 'control-panel__label', '切换与搜索'));
+  const wallRow = el('div', 'control-panel__segments control-panel__walls');
+  wallRow.setAttribute('role', 'group');
+  wallRow.setAttribute('aria-label', '拼贴墙');
   const libraryWall = el('button', undefined, '曲库拼贴墙');
   libraryWall.type = 'button';
   libraryWall.dataset.wall = 'library';
@@ -77,13 +84,14 @@ export function createControlPanel(
   wallRow.append(libraryWall, albumWall);
   wallSection.append(wallRow);
 
-  const searchSection = el('section', 'control-panel__section');
-  searchSection.append(el('h3', 'control-panel__label', options.search.searchLabel));
+  const searchSection = el('div', 'control-panel__search');
+  const searchLabel = el('label', 'control-panel__field-label', options.search.searchLabel);
   const search = el('input');
   search.type = 'search';
   search.placeholder = options.search.placeholder;
   search.setAttribute('aria-label', options.search.searchLabel);
   search.maxLength = 160;
+  searchLabel.append(search);
   const previous = el('button', undefined, '上一页');
   previous.type = 'button';
   const next = el('button', undefined, '下一页');
@@ -93,17 +101,38 @@ export function createControlPanel(
   const refresh = el('button', undefined, '刷新');
   refresh.type = 'button';
   const pager = el('div', 'control-panel__pager');
-  pager.append(previous, status, next, refresh);
-  searchSection.append(search, pager);
+  pager.append(status, previous, next, refresh);
+  searchSection.append(searchLabel, pager);
+  wallSection.append(searchSection);
 
   const appearance = createControlPanelSettings({
+    titleLabel: options.wall === 'library' ? '常显歌名' : '常显专辑名',
     lyrics: options.lyrics === true,
     settings: options.settings,
     onPatchSettings: options.onPatchSettings,
     signal,
   });
+  const shortcutSetting = createControlPanelShortcut({
+    value: panelShortcut,
+    onChange: value => options.onPatchSettings({ controlPanelShortcut: value }),
+    signal,
+  });
 
-  form.append(header, wallSection, searchSection, appearance.root);
+  const body = el('div', 'control-panel__body');
+  const { sections } = appearance;
+  const tabs = createControlPanelTabs([
+    { id: 'browse', label: '浏览', sections: [wallSection, shortcutSetting.root] },
+    { id: 'playback', label: '播放', sections: [sections.behavior, sections.lyrics] },
+    { id: 'appearance', label: '外观', sections: [sections.display] },
+    { id: 'lighting', label: '光影', sections: [sections.lighting] },
+  ], signal, category => {
+    if (category !== 'browse') shortcutSetting.cancel();
+  });
+  body.append(tabs.navigation, tabs.pages);
+  const footer = el('div', 'control-panel__footer');
+  const shortcut = el('span', 'control-panel__shortcut');
+  footer.append(el('span', undefined, '设置即时生效'), shortcut);
+  form.append(header, body, footer);
   dialog.append(form);
   container.append(dialog);
 
@@ -114,6 +143,7 @@ export function createControlPanel(
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const close = (): void => {
+    shortcutSetting.cancel();
     dialog.close();
     const target = returnFocus?.isConnected ? returnFocus : document.getElementById('field');
     target?.focus({ preventScroll: true });
@@ -144,13 +174,21 @@ export function createControlPanel(
   };
 
   const syncSettings = (next: LatticeSettings): void => {
+    panelShortcut = next.controlPanelShortcut;
+    shortcutSetting.sync(panelShortcut);
+    dialog.setAttribute('aria-keyshortcuts', panelShortcutAria(panelShortcut));
+    const field = container.querySelector<HTMLElement>('#field');
+    field?.setAttribute('aria-label', `${options.wall === 'library' ? '曲库' : '专辑'}拼贴墙`);
+    field?.setAttribute('aria-keyshortcuts', panelShortcutAria(panelShortcut));
+    field?.setAttribute('aria-description', `按 ${panelShortcut.split('+').join(' + ')} 打开功能面板`);
+    shortcut.replaceChildren(...panelShortcut.split('+').flatMap((key, index) =>
+      index === 0 ? [el('kbd', undefined, key)] : [document.createTextNode(' + '), el('kbd', undefined, key)]));
     appearance.sync(next);
     syncWall();
   };
 
   document.addEventListener('keydown', (event) => {
-    if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey || event.isComposing
-      || (event.code !== 'Space' && event.key !== ' ')) return;
+    if (shortcutSetting.recording || !matchesPanelShortcut(event, panelShortcut)) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.repeat) return;
@@ -158,6 +196,7 @@ export function createControlPanel(
       returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       dialog.showModal();
     }
+    tabs.select('browse');
     search.focus();
     search.select();
   }, { signal, capture: true });
@@ -177,7 +216,7 @@ export function createControlPanel(
   }, { signal });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    load(1);
+    if (tabs.selected === 'browse') load(1);
   }, { signal });
   previous.addEventListener('click', () => load(Math.max(1, page - 1)), { signal });
   next.addEventListener('click', () => load(page + 1), { signal });
@@ -244,6 +283,7 @@ export function createControlPanel(
     },
     syncSettings,
     dispose() {
+
       clearTimeout(timer);
       abort.abort();
       dialog.close();

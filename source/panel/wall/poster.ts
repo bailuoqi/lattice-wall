@@ -80,6 +80,9 @@ export type PosterElement = {
   readonly body: HTMLElement;
   readonly cover: HTMLImageElement;
   readonly fallback: HTMLElement;
+  readonly caption: HTMLElement;
+  readonly captionTitle: HTMLElement;
+  readonly captionArtist: HTMLElement;
   /** Rect last written to the inline style; `applyRect` compares against it to skip redundant writes. */
   readonly rect: PixelRect;
   expanded: ExpandedContent | null;
@@ -161,13 +164,22 @@ export function createPosterElement(): PosterElement {
   const fallback = createDiv('poster__fallback');
   // The fallback precedes the cover so the image paints above the gradient in plain DOM order.
   body.append(fallback, cover, createDiv('poster__shade'), createDiv('poster__tint'), createDiv('poster__lights'));
-  root.append(body);
+  const caption = createDiv('poster__caption');
+  const captionTitle = createDiv('poster__caption-title');
+  const captionArtist = createDiv('poster__caption-artist');
+  caption.append(captionTitle, captionArtist);
+  caption.hidden = true;
+  caption.setAttribute('aria-hidden', 'true');
+  root.append(body, caption);
 
   const el: PosterElement = {
     root,
     body,
     cover,
     fallback,
+    caption,
+    captionTitle,
+    captionArtist,
     rect: { x: NaN, y: NaN, w: NaN, h: NaN },
     expanded: null,
     shown: { coverUrl: null, coverSrc: null, box: { w: 0, h: 0 }, trackId: null, label: '', current: false, hoverGap: NaN },
@@ -188,6 +200,7 @@ export function applyCardBox(el: PosterElement, box: { w: number; h: number }, r
   const shown = el.shown;
   if (shown.box.w === box.w && shown.box.h === box.h) return;
   shown.box = { w: box.w, h: box.h };
+  el.root.style.setProperty('--caption-lines', String(Math.max(1, Math.min(3, Math.floor((box.h - 50) / 35.2)))));
   if (refreshCover) syncCover(el);
 }
 
@@ -197,6 +210,7 @@ export function applyTile(el: PosterElement, tile: Tile | undefined, isCurrent: 
   const coverUrl = tile?.coverUrl ?? null;
   if (coverUrl !== shown.coverUrl) {
     shown.coverUrl = coverUrl;
+    el.root.dataset.squareCover = String(coverUrl !== null && LOCAL_COVER_VARIANT.test(coverUrl));
   }
   syncCover(el);
 
@@ -211,6 +225,15 @@ export function applyTile(el: PosterElement, tile: Tile | undefined, isCurrent: 
     shown.label = label;
     el.root.setAttribute('aria-label', label);
   }
+
+  const title = tile?.title ?? '';
+  if (el.captionTitle.textContent !== title) {
+    el.captionTitle.textContent = title;
+    el.root.title = title;
+  }
+  const artist = tile?.artist ?? '';
+  if (el.captionArtist.textContent !== artist) el.captionArtist.textContent = artist;
+  el.caption.hidden = !title;
 
   if (isCurrent !== shown.current) {
     shown.current = isCurrent;
@@ -250,6 +273,7 @@ export function applyRect(el: PosterElement, rect: PixelRect, gap: number): void
     style.height = `${h}px`;
   }
   if (sizeChanged || gap !== el.shown.hoverGap) {
+    style.setProperty('--cover-side', `${Math.max(w, h)}px`);
     el.shown.hoverGap = gap;
     const scale = hoverScale(last, gap);
     style.setProperty('--hx', scale.x.toFixed(4));

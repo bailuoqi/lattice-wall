@@ -1,4 +1,4 @@
-import type { CellSizeId, LatticeSettings, LightingMode } from './types.ts';
+import type { CellSizeId, LatticeSettings, LightingMode, TintGradient } from './types.ts';
 import { controlPanelSettingLocks, sanitizeUiFont } from './host/settings.ts';
 
 const FONT_PRESETS: ReadonlyArray<{ value: string; label: string }> = [
@@ -16,6 +16,11 @@ const CELL_SIZES: ReadonlyArray<{ value: CellSizeId; label: string }> = [
   { value: 'S', label: '小' },
   { value: 'M', label: '中' },
   { value: 'L', label: '大' },
+];
+const TINT_GRADIENTS: ReadonlyArray<{ value: TintGradient; label: string }> = [
+  { value: 'none', label: '无渐变' },
+  { value: 'diagonal', label: '斜向渐变' },
+  { value: 'vertical', label: '竖向渐变' },
 ];
 
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -37,7 +42,17 @@ const option = (value: string, label: string): HTMLOptionElement => {
 };
 
 const press = (button: HTMLButtonElement, on: boolean): void => {
-  button.setAttribute('aria-pressed', String(on));
+  button.setAttribute(button.getAttribute('role') === 'switch' ? 'aria-checked' : 'aria-pressed', String(on));
+};
+
+const toggleButton = (label: string): HTMLButtonElement => {
+  const button = el('button', 'control-panel__toggle');
+  button.type = 'button';
+  button.setAttribute('role', 'switch');
+  const track = el('span', 'control-panel__switch');
+  track.setAttribute('aria-hidden', 'true');
+  button.append(el('span', undefined, label), track);
+  return button;
 };
 
 const presetOf = (font: string): string =>
@@ -49,29 +64,32 @@ const presetOf = (font: string): string =>
  */
 export function createControlPanelSettings(
   options: {
+    titleLabel: string;
     lyrics: boolean;
     settings: LatticeSettings;
     onPatchSettings: (patch: Partial<LatticeSettings>) => void;
     signal: AbortSignal;
   },
-): { root: HTMLElement; sync(settings: LatticeSettings): void } {
+): { sections: { behavior: HTMLElement; display: HTMLElement; lighting: HTMLElement; lyrics: HTMLElement }; sync(settings: LatticeSettings): void } {
   const { signal } = options;
-  const root = el('div', 'control-panel__settings');
   let settings = options.settings;
 
   const behavior = el('section', 'control-panel__section');
-  behavior.append(el('h3', 'control-panel__label', '行为'));
-  const immersive = el('button', undefined, '打开时全屏沉浸');
-  immersive.type = 'button';
-  const autoFocus = el('button', undefined, '切歌自动聚焦');
-  autoFocus.type = 'button';
-  const behaviorRow = el('div', 'control-panel__options');
-  behaviorRow.append(immersive, autoFocus);
+  behavior.append(el('h3', 'control-panel__label', '播放行为'));
+  const immersive = toggleButton('打开时全屏沉浸');
+  const autoFocus = toggleButton('切歌自动聚焦');
+  const behaviorRow = el('div', 'control-panel__toggles');
+  behaviorRow.append(autoFocus);
   behavior.append(behaviorRow);
 
-  const cellSection = el('section', 'control-panel__section');
-  cellSection.append(el('h3', 'control-panel__label', '格子尺寸'));
-  const cellRow = el('div', 'control-panel__options');
+  const display = el('section', 'control-panel__section');
+  display.append(el('h3', 'control-panel__label', '外观与布局'));
+  const showTitles = toggleButton(options.titleLabel);
+  const cellSection = el('div', 'control-panel__setting-row');
+  cellSection.append(el('span', 'control-panel__field-label', '格子尺寸'));
+  const cellRow = el('div', 'control-panel__segments');
+  cellRow.setAttribute('role', 'group');
+  cellRow.setAttribute('aria-label', '格子尺寸');
   const cells = new Map<CellSizeId, HTMLButtonElement>();
   for (const item of CELL_SIZES) {
     const button = el('button', undefined, item.label);
@@ -82,44 +100,66 @@ export function createControlPanelSettings(
   }
   cellSection.append(cellRow);
 
-  const light = el('section', 'control-panel__section');
-  light.append(el('h3', 'control-panel__label', '封面灯光'));
-  const lightRow = el('div', 'control-panel__options');
+  const light = el('section', 'control-panel__section control-panel__lighting');
+  const lightHeader = el('div', 'control-panel__setting-row');
+  const lightHeading = el('div', 'control-panel__heading');
+  const lightHint = el('p', 'control-panel__hint');
+  lightHeading.append(el('h3', 'control-panel__label', '封面灯光'), lightHint);
+  const lightRow = el('div', 'control-panel__segments');
+  lightRow.setAttribute('role', 'group');
+  lightRow.setAttribute('aria-label', '封面灯光');
   const spotlight = el('button', undefined, '聚光灯');
   spotlight.type = 'button';
   const daytime = el('button', undefined, '白天');
   daytime.type = 'button';
   lightRow.append(spotlight, daytime);
-  const lightHint = el('p', 'control-panel__hint');
-  const shadeLabel = el('h3', 'control-panel__label', '聚光灯细节');
-  const shadeRow = el('div', 'control-panel__options');
-  const vignette = el('button', undefined, '边缘暗角');
-  vignette.type = 'button';
-  const lightsOut = el('button', undefined, '关灯');
-  lightsOut.type = 'button';
-  const posterTint = el('button', undefined, '非活动海报叠色');
-  posterTint.type = 'button';
+  lightHeader.append(lightHeading, lightRow);
+  const shadeRow = el('div', 'control-panel__toggles control-panel__shade');
+  const vignette = toggleButton('边缘暗角');
+  const lightsOut = toggleButton('关灯');
+  const posterTint = toggleButton('非活动海报叠色');
   shadeRow.append(vignette, lightsOut, posterTint);
-  const tintLabel = el('h3', 'control-panel__label', '叠色细节');
-  const tintRow = el('div', 'control-panel__row');
-  const custom = el('button', undefined, '使用自定义叠色');
-  custom.type = 'button';
+  const gradientSection = el('div', 'control-panel__setting-row control-panel__gradient');
+  gradientSection.append(el('span', 'control-panel__field-label', '叠色方式'));
+  const gradientRow = el('div', 'control-panel__segments');
+  gradientRow.setAttribute('role', 'group');
+  gradientRow.setAttribute('aria-label', '叠色方式');
+  const gradients = new Map<TintGradient, HTMLButtonElement>();
+  for (const item of TINT_GRADIENTS) {
+    const button = el('button', undefined, item.label);
+    button.type = 'button';
+    gradients.set(item.value, button);
+    gradientRow.append(button);
+  }
+  gradientSection.append(gradientRow);
+  const tintRow = el('div', 'control-panel__tint');
+  const colorRow = el('div', 'control-panel__row');
+  const custom = toggleButton('自定义叠色');
   const color = el('input');
   color.type = 'color';
   color.setAttribute('aria-label', '自定义叠色');
-  const intensityLabel = el('label', 'control-panel__field-label', '叠色强度');
+  const intensityRow = el('label', 'control-panel__intensity');
+  const intensityLabel = el('span', 'control-panel__field-label', '叠色强度');
   const intensity = el('input');
   intensity.type = 'range';
   intensity.min = '0';
   intensity.max = '1';
   intensity.step = '0.05';
   intensity.setAttribute('aria-label', '叠色强度');
-  tintRow.append(custom, color, intensityLabel, intensity);
+  const intensityValue = el('span', 'control-panel__value');
+  const renderIntensity = (): void => {
+    const percent = `${Math.round(Number(intensity.value) * 100)}%`;
+    intensityValue.textContent = percent;
+    intensity.setAttribute('aria-valuetext', percent);
+  };
+  colorRow.append(custom, color);
+  intensityRow.append(intensityLabel, intensity, intensityValue);
+  tintRow.append(colorRow, intensityRow);
   const tintHint = el('p', 'control-panel__hint');
-  light.append(lightRow, lightHint, shadeLabel, shadeRow, tintLabel, tintRow, tintHint);
+  light.append(lightHeader, shadeRow, gradientSection, tintRow, tintHint);
 
-  const fontSection = el('section', 'control-panel__section');
-  fontSection.append(el('h3', 'control-panel__label', '界面字体'));
+  const fontSection = el('label', 'control-panel__setting-row');
+  fontSection.append(el('span', 'control-panel__field-label', '界面字体'));
   const font = el('select');
   font.setAttribute('aria-label', '界面字体');
   for (const item of FONT_PRESETS) font.append(option(item.value, item.label));
@@ -129,20 +169,18 @@ export function createControlPanelSettings(
   customFont.maxLength = 80;
   customFont.placeholder = '输入字体名，例如 Cascadia Code';
   customFont.setAttribute('aria-label', '自定义字体');
-  fontSection.append(font, customFont);
+  fontSection.append(font);
+  display.append(showTitles, cellSection, fontSection, customFont, immersive);
 
-  const lyrics = el('section', 'control-panel__section');
+  const lyrics = el('section', 'control-panel__section control-panel__lyrics');
   lyrics.hidden = !options.lyrics;
-  lyrics.append(el('h3', 'control-panel__label', '歌词'));
-  const lyricsRow = el('div', 'control-panel__options');
-  const showLyrics = el('button', undefined, '当前曲歌词');
-  showLyrics.type = 'button';
-  const showTranslation = el('button', undefined, '翻译行');
-  showTranslation.type = 'button';
+  const lyricsHeading = el('div', 'control-panel__section-heading');
+  lyricsHeading.append(el('h3', 'control-panel__label', '歌词'), el('p', 'control-panel__hint', '只作用于曲库墙展开的当前曲。'));
+  const lyricsRow = el('div', 'control-panel__toggles');
+  const showLyrics = toggleButton('当前曲歌词');
+  const showTranslation = toggleButton('翻译行');
   lyricsRow.append(showLyrics, showTranslation);
-  lyrics.append(lyricsRow, el('p', 'control-panel__hint', '只作用于曲库墙展开的当前曲。'));
-
-  root.append(behavior, cellSection, light, fontSection, lyrics);
+  lyrics.append(lyricsHeading, lyricsRow);
 
   let shadeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -155,15 +193,20 @@ export function createControlPanelSettings(
     const locks = controlPanelSettingLocks(next);
     press(immersive, next.immersive);
     press(autoFocus, next.autoFocus);
+    press(showTitles, next.showTitles);
     for (const [size, button] of cells) press(button, next.cellSize === size);
     press(spotlight, next.lightingMode === 'spotlight');
     press(daytime, next.lightingMode === 'daytime');
     lightHint.textContent = locks.spotlight
-      ? '未选中封面保留边缘暗角、关灯与非活动海报叠色。'
-      : '所有封面一样亮；暗角、关灯和叠色只保存在设置里，白天时不生效。';
+      ? '突出当前封面，为周围封面添加光影层次。'
+      : '所有封面均匀照亮，下方光影设置暂不生效。';
     press(vignette, next.vignette);
     press(lightsOut, next.lightsOut);
     press(posterTint, next.posterTint);
+    for (const [gradient, button] of gradients) {
+      press(button, next.posterTintGradient === gradient);
+      disable(button, !locks.tint);
+    }
     press(custom, next.posterTintCustom);
     disable(vignette, !locks.spotlight);
     disable(lightsOut, !locks.spotlight);
@@ -174,8 +217,9 @@ export function createControlPanelSettings(
     shadeRow.classList.toggle('is-disabled', !locks.spotlight);
     tintRow.classList.toggle('is-disabled', !locks.tint);
     if (color.value !== next.posterTintColor) color.value = next.posterTintColor;
-    const intensityValue = String(next.posterTintIntensity);
-    if (intensity.value !== intensityValue) intensity.value = intensityValue;
+    const intensitySetting = String(next.posterTintIntensity);
+    if (intensity.value !== intensitySetting) intensity.value = intensitySetting;
+    renderIntensity();
     tintHint.textContent = next.posterTintCustom
       ? '叠色使用所选颜色。'
       : '关闭自定义时叠色保持纯黑。';
@@ -189,12 +233,13 @@ export function createControlPanelSettings(
   };
 
   const patch = (next: Partial<LatticeSettings>): void => options.onPatchSettings(next);
-  const toggle = (key: 'immersive' | 'autoFocus' | 'vignette' | 'lightsOut' | 'posterTint' | 'posterTintCustom' | 'showLyrics' | 'showTranslation'): void => {
+  const toggle = (key: 'immersive' | 'autoFocus' | 'vignette' | 'lightsOut' | 'posterTint' | 'posterTintCustom' | 'showTitles' | 'showLyrics' | 'showTranslation'): void => {
     patch({ [key]: !settings[key] });
   };
 
   immersive.addEventListener('click', () => toggle('immersive'), { signal });
   autoFocus.addEventListener('click', () => toggle('autoFocus'), { signal });
+  showTitles.addEventListener('click', () => toggle('showTitles'), { signal });
   for (const [size, button] of cells) {
     button.addEventListener('click', () => {
       if (settings.cellSize !== size) patch({ cellSize: size });
@@ -208,6 +253,11 @@ export function createControlPanelSettings(
   vignette.addEventListener('click', () => toggle('vignette'), { signal });
   lightsOut.addEventListener('click', () => toggle('lightsOut'), { signal });
   posterTint.addEventListener('click', () => toggle('posterTint'), { signal });
+  for (const [gradient, button] of gradients) {
+    button.addEventListener('click', () => {
+      if (settings.posterTintGradient !== gradient) patch({ posterTintGradient: gradient });
+    }, { signal });
+  }
   custom.addEventListener('click', () => toggle('posterTintCustom'), { signal });
   color.addEventListener('input', () => {
     const value = color.value.toLowerCase();
@@ -220,6 +270,7 @@ export function createControlPanelSettings(
     patch({ posterTintIntensity: Math.min(1, Math.max(0, value)) });
   };
   intensity.addEventListener('input', () => {
+    renderIntensity();
     clearTimeout(shadeTimer);
     shadeTimer = setTimeout(commitIntensity, 80);
   }, { signal });
@@ -245,5 +296,5 @@ export function createControlPanelSettings(
   signal.addEventListener('abort', () => clearTimeout(shadeTimer), { once: true });
 
   sync(settings);
-  return { root, sync };
+  return { sections: { behavior, display, lighting: light, lyrics }, sync };
 }
