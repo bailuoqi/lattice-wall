@@ -56,7 +56,8 @@ instructions for a distributed package must match that package's version.
 
 The album wall of [folia-major](https://github.com/chthollyphile/folia-major)
 (AGPL-3.0) is an acknowledged reference. The previous clean-room and no-copying
-claims have been withdrawn. See [ASSET_SOURCES.md](./ASSET_SOURCES.md).
+claims have been withdrawn. The earlier statements resulted from hallucinations and
+misjudgment by 大肥鱼; we ask for your understanding. See [ASSET_SOURCES.md](./ASSET_SOURCES.md).
 The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
 
 ## Library wall features

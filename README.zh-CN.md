@@ -40,7 +40,7 @@ Lattice Wall 采用 **GNU Affero 通用公共许可证第 3 版，仅限该版�
 分发包对应的源码和构建说明必须与所分发版本一致。
 
 本项目参考了 [folia-major](https://github.com/chthollyphile/folia-major) 的专辑墙（AGPL-3.0）。
-撤回此前关于 clean-room／干净重写以及未复制代码、数据和样式的声明，详见
+撤回此前关于 clean-room／干净重写以及未复制代码、数据和样式的声明。先前的声明系大肥鱼幻觉误判，请大家见谅。详见
 [ASSET_SOURCES.md](./ASSET_SOURCES.md)。内置 ECHO Workshop SDK 保留其自身的
 [MIT 许可证](./.echo-sdk/LICENSE)。
 
