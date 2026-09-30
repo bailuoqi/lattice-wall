@@ -97,7 +97,7 @@ function layoutValue(index: number): number {
 
 function mod(value: number, modulus: number): number {
   const remainder = value % modulus;
-  return remainder < 0 ? remainder + modulus : remainder;
+  return remainder < 0 ? remainder + modulus : remainder || 0;
 }
 
 function layoutOffsetFor(bc: number, br: number, expanded: Instance | null): number {
@@ -138,7 +138,8 @@ export function planLatticeSlots(tileCount: number, metrics: Metrics): LatticeSl
   }
 
   const blocksNeeded = Math.ceil(tileCount / SLOTS_PER_BLOCK);
-  const cellCols = Math.ceil(Math.sqrt(blocksNeeded));
+  // Blocks are wider than they are tall. Balance physical dimensions and avoid excess copies.
+  const cellCols = Math.max(1, Math.round(Math.sqrt(blocksNeeded * BLOCK_ROWS / BLOCK_COLS)));
   const cellRows = Math.ceil(blocksNeeded / cellCols);
   const blocksPerCell = cellCols * cellRows;
   const cellSlotCount = blocksPerCell * SLOTS_PER_BLOCK;

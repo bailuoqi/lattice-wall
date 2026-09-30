@@ -135,6 +135,7 @@ export function createLyricsView(): LyricsView {
   function renderCurrentRow(line: LyricsLine | undefined): void {
     wordSpans = [];
     lastGlow = [];
+    rows.current.root.hidden = line === undefined;
     rows.current.translation.textContent = line?.translation ?? '';
     if (line === undefined) {
       rows.current.text.replaceChildren();

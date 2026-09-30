@@ -17,7 +17,6 @@ export function createAlbumLyrics(host: AlbumLyricsHost, onLayoutChange: () => v
   message.textContent = '正在同步歌曲…';
   message.setAttribute('role', 'status');
   const view = createLyricsView();
-  view.element.dataset.scrollable = 'true';
   element.append(message, view.element);
   let trackId: string | null = null;
   let loadedId: string | null = null;

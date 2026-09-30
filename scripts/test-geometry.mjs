@@ -238,7 +238,7 @@ describe('lattice cell', () => {
   });
 
   test('cell dimensions form a full rectangle of blocks', () => {
-    const expected = { 1: [1, 1], 5: [1, 1], 12: [1, 1], 13: [2, 1], 50: [3, 2], 500: [7, 6] };
+    const expected = { 1: [1, 1], 5: [1, 1], 12: [1, 1], 13: [1, 2], 50: [2, 3], 500: [5, 9] };
     for (const tileCount of TILE_COUNTS) {
       const lattice = createLattice(tileCount, METRICS);
       const blocksNeeded = Math.ceil(tileCount / SLOTS_PER_BLOCK);
@@ -590,7 +590,7 @@ describe('slotToTile mapping', () => {
     const lattice = createLattice(tileCount, METRICS, mapping);
     const origin = lattice.instanceAt(0, 0, 0, null);
     assert.equal(origin.tileIndex, mapping[0]);
-    const lastSlot = lattice.instanceAt(1, 0, 11, null);
+    const lastSlot = lattice.instanceAt(lattice.cellCols - 1, lattice.cellRows - 1, 11, null);
     assert.equal(lastSlot.tileIndex, mapping[23]);
     const point = lattice.centerOf(origin.rect);
     const nearest = lattice.nearestInstance(origin.tileIndex, point, null);

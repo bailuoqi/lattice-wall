@@ -75,8 +75,8 @@ test('current library index matches the playing track on this page only', () => 
 });
 
 test('page notice hides paging when the library fits on one wall', () => {
-  assert.equal(libraryPageNotice({ page: 1, pageSize: 800, total: 523 }), '共 523 首');
-  assert.equal(libraryPageNotice({ page: 2, pageSize: 800, total: 2000 }), '第 2 / 3 页 · 共 2000 首');
+  assert.equal(libraryPageNotice({ page: 1, pageSize: 200, total: 123 }), '共 123 首');
+  assert.equal(libraryPageNotice({ page: 2, pageSize: 200, total: 2000 }), '第 2 / 10 页 · 共 2000 首');
 });
 
 test('play context stays inside the host 200-id cap and keeps the chosen track', () => {
@@ -87,41 +87,41 @@ test('play context stays inside the host 200-id cap and keeps the chosen track',
   assert.equal(playContextIds(tiles.slice(0, 40), 3).length, 40);
 });
 
-test('the wall loader stops after the last host page when the library is under 800', async () => {
-  const { queries, read } = hostReader(catalog(250));
+test('the wall loader stops after the last host page when the library is under 200', async () => {
+  const { queries, read } = hostReader(catalog(150));
   const loader = createLibraryTrackLoader(read);
   const result = await loader.load(1, '');
-  assert.equal(result.items.length, 250);
+  assert.equal(result.items.length, 150);
   assert.equal(result.pageSize, LIBRARY_WALL_PAGE_SIZE);
   assert.equal(result.hasMore, false);
-  assert.deepEqual(queries.map((query) => query.page), [1, 2, 3]);
+  assert.deepEqual(queries.map((query) => query.page), [1, 2]);
   assert.ok(queries.every((query) => query.pageSize === LIBRARY_HOST_PAGE_SIZE));
 });
 
-test('801 tracks fill the first wall and leave a one-track second page', async () => {
-  const { queries, read } = hostReader(catalog(801));
+test('201 tracks fill the first wall and leave a one-track second page', async () => {
+  const { queries, read } = hostReader(catalog(201));
   const loader = createLibraryTrackLoader(read);
   const first = await loader.load(1, '');
-  assert.equal(first.items.length, 800);
+  assert.equal(first.items.length, 200);
   assert.equal(first.hasMore, true);
-  assert.deepEqual(queries.map((query) => query.page), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(queries.map((query) => query.page), [1, 2]);
   queries.length = 0;
   const second = await loader.load(2, '');
   assert.equal(second.items.length, 1);
-  assert.equal(second.items[0].id, 'track-801');
+  assert.equal(second.items[0].id, 'track-201');
   assert.equal(second.hasMore, false);
-  assert.deepEqual(queries.map((query) => query.page), [9]);
+  assert.deepEqual(queries.map((query) => query.page), [3]);
 });
 
-test('the wall loader pages by 800 and maps wall page 2 onto host pages 9–16', async () => {
-  const { queries, read } = hostReader(catalog(1600));
+test('the wall loader pages by 200 and maps wall page 2 onto host pages 3–4', async () => {
+  const { queries, read } = hostReader(catalog(400));
   const loader = createLibraryTrackLoader(read);
   const result = await loader.load(2, 'live');
   assert.equal(result.page, 2);
-  assert.equal(result.items.length, 800);
-  assert.equal(result.items[0].id, 'track-801');
+  assert.equal(result.items.length, 200);
+  assert.equal(result.items[0].id, 'track-201');
   assert.equal(result.hasMore, false);
-  assert.deepEqual(queries.map((query) => query.page), [9, 10, 11, 12, 13, 14, 15, 16]);
+  assert.deepEqual(queries.map((query) => query.page), [3, 4]);
   assert.ok(queries.every((query) => query.search === 'live'));
 });
 

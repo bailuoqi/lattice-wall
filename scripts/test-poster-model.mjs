@@ -27,7 +27,9 @@ test('coverVariantFor picks the smallest variant that covers the box in device p
   assert.equal(coverVariantFor({ w: 264, h: 264 }, false, 1.5), 'album');
   assert.equal(coverVariantFor({ w: 400, h: 264 }, false, 1.5), 'large');
   assert.equal(coverVariantFor({ w: 264, h: 264 }, false, 2), 'large');
-  assert.equal(coverVariantFor({ w: 264, h: 264 }, true, 1), 'large');
+  assert.equal(coverVariantFor({ w: 264, h: 264 }, true, 1), 'album');
+  assert.equal(coverVariantFor({ w: 264, h: 264 }, true, 1, 2), 'large');
+  assert.equal(coverVariantFor({ w: 420, h: 264 }, false, 1, 1, 'large'), 'large');
   assert.equal(coverVariantFor({ w: 264, h: 264 }, false), 'album');
 });
 

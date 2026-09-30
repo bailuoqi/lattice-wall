@@ -136,9 +136,12 @@ describe('createSpreadLattice', () => {
     assert.equal(plan.rects[slot]?.w, plan.rects[slot]?.h);
 
     const lattice = createSpreadLattice(tiles, METRICS, { tileIndex: 3, near });
+    const pinned = lattice.instanceAt(Math.floor(slot / 12) % lattice.cellCols,
+      Math.floor(Math.floor(slot / 12) / lattice.cellCols), slot % 12, null);
+    assert.equal(pinned.tileIndex, 3);
+    assert.equal(pinned.rect.w, pinned.rect.h);
     const landed = lattice.nearestInstance(3, near, null);
     assert.equal(landed.tileIndex, 3);
-    assert.equal(landed.rect.w, landed.rect.h);
   });
 
   test('repair does not move the pinned slot', () => {

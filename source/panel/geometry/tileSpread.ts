@@ -1,22 +1,22 @@
 /**
- * Cover-aware slot assignment for the library wall. Sequential `cellSlot % tileCount` packs an album's
- * tracks into a contiguous region; this module places copies of the same cover by farthest-point
- * sampling on the periodic cell, then swaps any remaining edge-adjacent pairs. Geometry stays in
+ * Identity- and cover-aware slot assignment shared by the library and album walls. Repeated tiles
+ * take priority over shared artwork when spreading cards across the periodic cell. Geometry stays in
  * `lattice.ts`; this file only decides `slot → tileIndex`.
  */
 
-import { SLOTS_PER_BLOCK, type GridRect, type Instance, type Lattice, type Metrics, type Point, type Tile } from '../types.ts';
+import { SLOTS_PER_BLOCK, type Instance, type Lattice, type Metrics, type Point, type Tile } from '../types.ts';
 import { createLattice, planLatticeSlots, type LatticeSlotPlan } from './lattice.ts';
+import { repairSlotSpacing, slotGap2 } from './slotSpacing.ts';
 
 /** Pin one tile to a slot (used after collapsing the playing track onto a nearby square). */
 export type SlotPin = { tileIndex: number; slot: number };
 export type SpreadPin = { tileIndex: number; near: Point };
 
 const LOCAL_COVER_VARIANT = /^echo-cover:\/\/(?:thumb|album|large)\//u;
-const REPAIR_PASSES = 8;
 
-export function tileCoverKey(tile: Pick<Tile, 'album' | 'artist' | 'coverUrl' | 'trackId'>): string {
+export function tileCoverKey(tile: Pick<Tile, 'album' | 'artist' | 'coverUrl' | 'trackId' | 'albumId'>): string {
   if (tile.coverUrl) return tile.coverUrl.replace(LOCAL_COVER_VARIANT, 'echo-cover://cover/');
+  if (tile.albumId) return `album-id:${tile.albumId}`;
   const album = tile.album.trim();
   if (album !== '') return `album:${tile.artist.trim()}\0${album}`;
   return `track:${tile.trackId}`;
@@ -36,17 +36,18 @@ export function torusDistance2(
   return dx * dx + dy * dy;
 }
 
-function extraTileIndexes(coverKeys: readonly string[], extra: number): number[] {
+function extraTileIndexes(coverKeys: readonly string[], extra: number, pinnedTile = -1): number[] {
   if (extra <= 0) return [];
   const freq = new Map<string, number>();
   for (const key of coverKeys) freq.set(key, (freq.get(key) ?? 0) + 1);
-  const order = coverKeys.map((_, index) => index);
+  // Keep the pinned card's square as its only copy when other tiles can fill the gaps.
+  const order = coverKeys.map((_, index) => index).filter(index => index !== pinnedTile || coverKeys.length === 1);
   order.sort((a, b) => {
     const freqA = freq.get(coverKeys[a] ?? '') ?? 0;
     const freqB = freq.get(coverKeys[b] ?? '') ?? 0;
     return freqA - freqB || a - b;
   });
-  return order.slice(0, extra);
+  return Array.from({ length: extra }, (_, index) => order[index % order.length]!);
 }
 
 function groupsLargestFirst(copies: readonly number[], coverKeys: readonly string[]): number[][] {
@@ -60,120 +61,6 @@ function groupsLargestFirst(copies: readonly number[], coverKeys: readonly strin
   return [...groups.values()].sort((a, b) => b.length - a.length || (a[0] ?? 0) - (b[0] ?? 0));
 }
 
-function shareEdge(a: GridRect, b: GridRect): boolean {
-  const aRight = a.col + a.w;
-  const aBottom = a.row + a.h;
-  const bRight = b.col + b.w;
-  const bBottom = b.row + b.h;
-  const overlapX = Math.min(aRight, bRight) - Math.max(a.col, b.col);
-  const overlapY = Math.min(aBottom, bBottom) - Math.max(a.row, b.row);
-  if (overlapX > 0 && (aRight === b.col || bRight === a.col)) return true;
-  if (overlapY > 0 && (aBottom === b.row || bBottom === a.row)) return true;
-  return false;
-}
-
-function shareEdgeTorus(a: GridRect, b: GridRect, gridCols: number, gridRows: number): boolean {
-  for (const ox of [-gridCols, 0, gridCols]) {
-    for (const oy of [-gridRows, 0, gridRows]) {
-      if (ox === 0 && oy === 0) {
-        if (shareEdge(a, b)) return true;
-        continue;
-      }
-      if (shareEdge(a, { col: b.col + ox, row: b.row + oy, w: b.w, h: b.h })) return true;
-    }
-  }
-  return false;
-}
-
-function slotNeighbors(rects: readonly GridRect[], gridCols: number, gridRows: number): number[][] {
-  const neighbors: number[][] = Array.from({ length: rects.length }, () => []);
-  for (let i = 0; i < rects.length; i++) {
-    const a = rects[i];
-    if (a === undefined) continue;
-    for (let j = i + 1; j < rects.length; j++) {
-      const b = rects[j];
-      if (b === undefined || !shareEdgeTorus(a, b, gridCols, gridRows)) continue;
-      neighbors[i]?.push(j);
-      neighbors[j]?.push(i);
-    }
-  }
-  return neighbors;
-}
-
-function pairConflicts(
-  assigned: readonly number[],
-  keys: readonly string[],
-  neighbors: readonly number[][],
-  slotA: number,
-  tileA: number,
-  slotB: number,
-  tileB: number,
-): number {
-  const keyA = keys[tileA];
-  const keyB = keys[tileB];
-  let count = 0;
-  for (const next of neighbors[slotA] ?? []) {
-    const tile = next === slotB ? tileB : assigned[next];
-    if (tile !== undefined && keys[tile] === keyA) count += 1;
-  }
-  for (const next of neighbors[slotB] ?? []) {
-    const tile = next === slotA ? tileA : assigned[next];
-    if (tile !== undefined && keys[tile] === keyB) count += 1;
-  }
-  return count;
-}
-
-/** Swap different-cover slots when that removes more same-cover edges than it creates. */
-function repairAdjacentPairs(
-  assigned: number[],
-  keys: readonly string[],
-  neighbors: readonly number[][],
-  lockedSlot = -1,
-): void {
-  const slotCount = assigned.length;
-  for (let pass = 0; pass < REPAIR_PASSES; pass++) {
-    let moved = false;
-    for (let slot = 0; slot < slotCount; slot++) {
-      if (slot === lockedSlot) continue;
-      const tile = assigned[slot];
-      if (tile === undefined) continue;
-      for (const other of neighbors[slot] ?? []) {
-        if (other <= slot || other === lockedSlot) continue;
-        const otherTile = assigned[other];
-        if (otherTile === undefined || keys[otherTile] !== keys[tile]) continue;
-        let best = -1;
-        let bestGain = 0;
-        for (let candidate = 0; candidate < slotCount; candidate++) {
-          if (candidate === slot || candidate === other || candidate === lockedSlot) continue;
-          const candidateTile = assigned[candidate];
-          if (candidateTile === undefined || keys[candidateTile] === keys[tile]) continue;
-          const before = pairConflicts(assigned, keys, neighbors, slot, tile, candidate, candidateTile);
-          const after = pairConflicts(assigned, keys, neighbors, slot, candidateTile, candidate, tile);
-          const gain = before - after;
-          if (gain > bestGain || (gain === bestGain && gain > 0 && (best < 0 || candidate < best))) {
-            bestGain = gain;
-            best = candidate;
-          }
-        }
-        if (best < 0 || bestGain <= 0) continue;
-        const swap = assigned[best];
-        if (swap === undefined) continue;
-        assigned[slot] = swap;
-        assigned[best] = tile;
-        moved = true;
-        break;
-      }
-    }
-    if (!moved) break;
-  }
-}
-
-/**
- * Assign every origin-cell slot a tile index. Each queue tile appears at least once; leftover
- * slots (the cell is a full rectangle of 12-slot blocks) become extra copies of the rarest covers.
- * Groups with the same cover key are placed by farthest-point sampling, then adjacent same-cover
- * pairs are swapped away when another cover can take the edge.
- */
 function wrapCoord(value: number, size: number): number {
   if (!(size > 0)) return 0;
   const wrapped = value % size;
@@ -181,13 +68,13 @@ function wrapCoord(value: number, size: number): number {
 }
 
 function pullMinDistFrom(slot: number, plan: LatticeSlotPlan, used: Uint8Array, minDist: Float64Array): void {
-  const placed = plan.centers[slot];
+  const placed = plan.rects[slot];
   if (placed === undefined) return;
   for (let other = 0; other < used.length; other++) {
     if (used[other] === 1) continue;
-    const point = plan.centers[other];
-    if (point === undefined) continue;
-    const distance = torusDistance2(placed.x, placed.y, point.x, point.y, plan.cellPixelSize);
+    const rect = plan.rects[other];
+    if (rect === undefined) continue;
+    const distance = slotGap2(placed, rect, plan.gridCols, plan.gridRows);
     const current = minDist[other];
     if (current !== undefined && distance < current) minDist[other] = distance;
   }
@@ -215,6 +102,7 @@ export function pickSquareSlot(plan: LatticeSlotPlan, near: Point): number {
   return bestSlot;
 }
 
+/** Place every tile, spreading its extra copies before optimizing shared-artwork spacing. */
 export function spreadSlotToTile(coverKeys: readonly string[], plan: LatticeSlotPlan, pin?: SlotPin): number[] {
   const tileCount = coverKeys.length;
   const slotCount = plan.centers.length;
@@ -229,7 +117,7 @@ export function spreadSlotToTile(coverKeys: readonly string[], plan: LatticeSlot
   }
 
   const copies = coverKeys.map((_, index) => index);
-  copies.push(...extraTileIndexes(coverKeys, slotCount - tileCount));
+  copies.push(...extraTileIndexes(coverKeys, slotCount - tileCount, pinTile));
   if (pinTile >= 0) {
     const removeAt = copies.indexOf(pinTile);
     if (removeAt >= 0) copies.splice(removeAt, 1);
@@ -238,9 +126,11 @@ export function spreadSlotToTile(coverKeys: readonly string[], plan: LatticeSlot
   const assigned = new Array<number>(slotCount).fill(-1);
   const used = new Uint8Array(slotCount);
   const minDist = new Float64Array(slotCount);
+  const tileSlots: number[][] = Array.from({ length: tileCount }, () => []);
   if (pinSlot >= 0 && pinTile >= 0) {
     assigned[pinSlot] = pinTile;
     used[pinSlot] = 1;
+    tileSlots[pinTile]!.push(pinSlot);
   }
 
   const pinKey = pinTile >= 0 ? (coverKeys[pinTile] ?? '') : '';
@@ -252,10 +142,16 @@ export function spreadSlotToTile(coverKeys: readonly string[], plan: LatticeSlot
     for (const tileIndex of group) {
       let bestSlot = -1;
       let best = -1;
+      let bestTileDistance = -1;
       for (let slot = 0; slot < slotCount; slot++) {
         if (used[slot] === 1) continue;
         const distance = minDist[slot] ?? 0;
-        if (distance > best || (distance === best && (bestSlot < 0 || slot < bestSlot))) {
+        let tileDistance = Infinity;
+        for (const prior of tileSlots[tileIndex]!) {
+          tileDistance = Math.min(tileDistance, slotGap2(plan.rects[slot]!, plan.rects[prior]!, plan.gridCols, plan.gridRows));
+        }
+        if (tileDistance > bestTileDistance || (tileDistance === bestTileDistance && distance > best)) {
+          bestTileDistance = tileDistance;
           best = distance;
           bestSlot = slot;
         }
@@ -263,11 +159,12 @@ export function spreadSlotToTile(coverKeys: readonly string[], plan: LatticeSlot
       if (bestSlot < 0) throw new Error('spreadSlotToTile ran out of slots');
       assigned[bestSlot] = tileIndex;
       used[bestSlot] = 1;
+      tileSlots[tileIndex]!.push(bestSlot);
       pullMinDistFrom(bestSlot, plan, used, minDist);
     }
   }
 
-  repairAdjacentPairs(assigned, coverKeys, slotNeighbors(plan.rects, plan.gridCols, plan.gridRows), pinSlot);
+  repairSlotSpacing(assigned, coverKeys, plan, pinSlot);
   return assigned;
 }
 

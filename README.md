@@ -4,11 +4,11 @@ English · [简体中文](./README.zh-CN.md)
 
 One plug-in, two player launchers: **Lattice · 曲库拼贴墙** and
 **Lattice · 专辑拼贴墙**. The id stays `echo.lattice-wall`, so existing
-installations retain their settings when updated to 1.1.0.
+installations retain their settings when updated to 1.2.0.
 
-The library wall loads up to 800 tracks from the ECHO library
+The library wall loads up to 200 tracks from the ECHO library
 (`echo.library.getTracks`) and tiles them into an endless, draggable wall of
-covers. Larger libraries page by 800. It does not read the play queue.
+covers. Larger libraries page by 200. It does not read the play queue.
 `Ctrl + Space` opens the function panel (search, paging, wall behaviour,
 lighting, poster tint, cell size, UI font, lyrics on the library wall, and
 switching walls). Expanded cards show playback
@@ -61,9 +61,9 @@ The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
 
 ## Library wall features
 
-- Up to 800 library tracks on one wall, tiled infinitely: drag in any
+- Up to 200 library tracks on one wall, tiled infinitely: drag in any
   direction, wheel / trackpad scrolling, inertia, keyboard navigation between
-  cards. Libraries larger than 800 page. Tracks that share a cover are spread
+  cards. Libraries larger than 200 page. Tracks that share a cover are spread
   across the wall instead of sitting next to each other. `Ctrl + Space`
   opens the function panel to search and turn pages.
 - 12×8 blocks built from five templates with hashed mirroring so

@@ -7,7 +7,6 @@
 import {
   BLOCK_COLS,
   BLOCK_ROWS,
-  type Camera,
   type ExpandedContent,
   type GridRect,
   type Instance,
@@ -16,7 +15,6 @@ import {
   type PosterWall,
   type PosterWallHandlers,
   type Tile,
-  type WallVisualOptions,
 } from '../types.ts';
 import { createRectSpring, type RectSpring } from './spring.ts';
 import {
@@ -29,8 +27,10 @@ import {
   entranceDelaySeconds,
   removeExpandedContent,
   resetPosterElement,
+  syncPosterCover,
   type PosterElement,
 } from './poster.ts';
+import { createCoverSwapQueue } from './posterCover.ts';
 
 const OVERSCAN_PX = 500;
 const RECULL_MARGIN_PX = 180;
@@ -40,11 +40,8 @@ const MAX_FRAME_SECONDS = 0.064;
 /** A gap longer than this means the rAF loop was idle; integrate one nominal frame instead of a big jump. */
 const IDLE_GAP_SECONDS = 0.25;
 /**
- * Cards a steady-state re-cull may (re)bind per frame. A pan crosses the re-cull margin every ~320 px
- * and would otherwise swap 20–40 cards (DOM, image, compositor layer) in one frame, which is the hitch
- * felt while dragging. New cards start 500 px off screen (nearest first), so spreading them out is
- * invisible, and cards that left the culled area are re-pointed at new instances in place instead of
- * being removed and re-inserted.
+ * Bound DOM/image work even at first paint or after a camera jump. Visible cards take priority,
+ * followed by overscan preparation. Reuse stale nodes in place instead of rebuilding the DOM tree.
  */
 const MOUNT_BUDGET_PER_FRAME = 8;
 
@@ -86,6 +83,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   /** `setFocus` asked to move DOM focus onto a card that was not mounted yet. */
   let focusPending = false;
   let reducedMotion = false;
+  let coverScale = 1;
 
   const pool = new Map<string, Entry>();
   const free: PosterElement[] = [];
@@ -99,6 +97,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   let layoutDirty = true;
   let culledOnce = false;
   const cullBounds: PixelRect = { x: 0, y: 0, w: 0, h: 0 };
+  const lastView = { x: NaN, y: NaN, scale: NaN };
   let lastNow: number | null = null;
   let entrance: 'idle' | 'pending' | 'played' = 'idle';
   /** `onExpandSettled` still owed for the current expansion. */
@@ -109,6 +108,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   let disposed = false;
   const abort = new AbortController();
   const signal = abort.signal;
+  const coverQueue = createCoverSwapQueue();
 
   const gap = (): number => (lattice ? lattice.metrics.gap : 0);
 
@@ -139,17 +139,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     for (const entry of pool.values()) clearFocusAttrs(entry.el);
   }
 
-  /** Keep the expanded card last in `.world`. Moving a node drops DOM focus silently, so restore it. */
-  function ensureOnTop(entry: Entry): void {
-    const root = entry.el.root;
-    if (world.lastElementChild === root) return;
-    const active = document.activeElement;
-    const refocus = active instanceof HTMLElement && root.contains(active) ? active : null;
-    world.appendChild(root);
-    refocus?.focus({ preventScroll: true });
-  }
-
-  /** New cards go beneath the expanded card so it never has to be re-appended (see `ensureOnTop`). */
+  /** Insert new cards without moving the expanded node; CSS z-index keeps it on top. */
   function insertCard(root: HTMLElement, instance: Instance): void {
     const anchor = expanded && expanded.id !== instance.id ? pool.get(expanded.id)?.el.root : undefined;
     if (anchor && anchor.parentElement === world) world.insertBefore(root, anchor);
@@ -213,7 +203,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     const entry: Entry = { el, instance, spring: null, tileIndex: instance.tileIndex, target, stamp };
     const tile = tiles[instance.tileIndex];
     // Commit the new box and cover together; do not request a resized variant of the old image.
-    applyCardBox(el, target, false);
+    el.shown.scale = coverScale;
+    applyCardBox(el, target);
     applyTile(el, tile, instance.tileIndex === currentTile);
     applyRect(el, target, lat.metrics.gap);
     el.root.dataset.instance = instance.id;
@@ -239,7 +230,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   }
 
   function mountEntry(lat: Lattice, instance: Instance, visible: PixelRect): Entry {
-    const el = free.pop() ?? createPosterElement();
+    const el = free.pop() ?? createPosterElement(coverQueue);
     const entry = bindEntry(lat, el, instance, visible);
     insertCard(el.root, instance);
     settleFocus(entry);
@@ -385,9 +376,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     stamp += 1;
     const snapAll = layoutDirty;
     layoutDirty = false;
-    // The first cull, a layout change and the entrance wave need every card in place this frame;
-    // steady-state re-culls while panning hand the work to `flushMounts` a few cards per frame.
-    const defer = culledOnce && !snapAll && entrance !== 'pending';
+    // All new cards share the mount budget, including first paint and fast camera jumps.
+    // The expanded card is the single immediate exception so its controls remain available.
     pendingMounts.length = 0;
     staleEntries.length = 0;
 
@@ -401,7 +391,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       if (entry) {
         entry.stamp = stamp;
         refreshEntry(lat, entry, instance, snapAll);
-      } else if (defer && !(expanded && expanded.id === instance.id)) {
+      } else if (!(expanded && expanded.id === instance.id)) {
         pendingMounts.push(instance);
       } else {
         const stale = staleEntries.pop();
@@ -419,14 +409,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       }
     }
 
-    if (!defer) while (staleEntries.length) recycleEntry(staleEntries.pop()!);
     // Stable partition: visible work first, preserve nearest-first order within each group.
     pendingMounts.sort((a, b) => Number(intersects(lat.toPixels(b.rect), bounds)) - Number(intersects(lat.toPixels(a.rect), bounds)));
-
-    if (expanded) {
-      const entry = pool.get(expanded.id);
-      if (entry) ensureOnTop(entry);
-    }
 
     cullBounds.x = bounds.x;
     cullBounds.y = bounds.y;
@@ -439,17 +423,23 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   /**
    * Works through the deferred cull a few cards per frame: fresh instances take over stale cards in
    * place, then any stale cards left over (the culled set shrank) go back to the free list. `render`
-   * keeps the frame loop alive until both queues are empty.
+   * keeps the frame loop alive for urgent work; distant overscan waits until motion settles.
    */
-  function flushMounts(lat: Lattice, bounds: PixelRect): void {
-    let budget = MOUNT_BUDGET_PER_FRAME;
-    const deadline = performance.now() + 3;
+  function flushMounts(lat: Lattice, bounds: PixelRect, cameraMoving: boolean): boolean {
+    let budget = cameraMoving ? 2 : MOUNT_BUDGET_PER_FRAME;
+    const deadline = performance.now() + (cameraMoving ? 1 : 3);
+    // Do not repaint the wall just to prepare distant overscan while it is moving.
+    // Re-evaluate against this frame's bounds: the camera can reverse between culls.
+    const urgentBounds = {
+      x: bounds.x - RECULL_MARGIN_PX, y: bounds.y - RECULL_MARGIN_PX,
+      w: bounds.w + RECULL_MARGIN_PX * 2, h: bounds.h + RECULL_MARGIN_PX * 2,
+    };
+    const urgent = (instance: Instance): boolean => intersects(lat.toPixels(instance.rect), urgentBounds);
     while (pendingMounts.length > 0) {
-      // A fast fling or camera jump can overtake the overscan. Fill visible holes in this frame;
-      // only offscreen preparation is allowed to wait for the budget of the next frame.
-      const visible = intersects(lat.toPixels(pendingMounts[0]!.rect), bounds);
-      if (!visible && (budget <= 0 || performance.now() >= deadline)) break;
-      const instance = pendingMounts.shift()!;
+      if (budget <= 0 || performance.now() >= deadline) break;
+      const index = cameraMoving ? pendingMounts.findIndex(urgent) : 0;
+      if (index < 0) break;
+      const instance = pendingMounts.splice(index, 1)[0]!;
       if (pool.has(instance.id)) continue;
       const stale = staleEntries.pop();
       if (stale) rebindEntry(lat, stale, instance, bounds);
@@ -460,6 +450,9 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       recycleEntry(staleEntries.pop()!);
       budget -= 1;
     }
+    // Offscreen work waits for input/animation or the settling frame, not a busy rAF loop.
+    return cameraMoving ? pendingMounts.some(urgent)
+      : pendingMounts.length > 0 || staleEntries.length > 0;
   }
 
   function applyEntrance(lat: Lattice, bounds: PixelRect): void {
@@ -706,7 +699,6 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
           delete entry.el.root.dataset.settled;
           buildExpandedContent(entry.el, tiles[entry.tileIndex]);
           if (!animate) entry.el.root.dataset.settled = 'true';
-          ensureOnTop(entry);
         }
       }
 
@@ -747,18 +739,31 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       }
       lastNow = nowMs;
 
+      coverScale = camera.state.scale;
+      // panBy() is an immediate move, not camera.animating. Track the displayed view so
+      // pointer/wheel input and inertia share the same foreground-work budget.
+      const viewChanged = Number.isFinite(lastView.x) && (
+        lastView.x !== camera.state.x || lastView.y !== camera.state.y || lastView.scale !== coverScale
+      );
+      const cameraMoving = viewChanged || camera.animating
+        || world.closest<HTMLElement>('.lattice-wall')?.dataset.dragging === 'true';
+      coverQueue.setPaused(cameraMoving);
+      lastView.x = camera.state.x;
+      lastView.y = camera.state.y;
+      lastView.scale = coverScale;
       const bounds = camera.bounds();
       if (needsCull || leavesCulledArea(bounds)) recull(lattice, bounds);
-      if (pendingMounts.length > 0 || staleEntries.length > 0) flushMounts(lattice, bounds);
+      const mounting = (pendingMounts.length > 0 || staleEntries.length > 0)
+        && flushMounts(lattice, bounds, cameraMoving);
       if (entrance === 'pending') applyEntrance(lattice, bounds);
 
-      let moving = pendingMounts.length > 0 || staleEntries.length > 0;
+      let moving = mounting;
       const g = lattice.metrics.gap;
       for (const entry of pool.values()) {
         const spring = entry.spring;
         if (!spring) continue;
         if (spring.step(dt)) {
-          applyRect(entry.el, spring.current, g);
+          applyRect(entry.el, spring.current, g, true);
           moving = true;
         } else {
           entry.spring = null;
@@ -768,7 +773,19 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
 
       if (collapsing && !collapsing.spring) finishCollapse();
       checkSettled();
-      return moving;
+      // Retain the existing image during motion. Settle size/zoom first, then change at most
+      // four sources per frame; the shared queue bounds temporary decoded replacements.
+      if (!moving && !cameraMoving) {
+        let budget = 4;
+        for (const entry of pool.values()) {
+          entry.el.shown.scale = coverScale;
+          if (!syncPosterCover(entry.el, false)) continue;
+          if (budget > 0) { syncPosterCover(entry.el); budget--; }
+          else moving = true;
+        }
+      }
+      // One settling frame flushes deferred cover sizes after the final immediate move.
+      return moving || viewChanged;
     },
 
     playEntrance() {
@@ -793,18 +810,21 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
 
     clear() {
       if (document.activeElement && world.contains(document.activeElement)) world.parentElement?.focus({ preventScroll: true });
-      for (const entry of pool.values()) entry.el.root.remove();
+      coverQueue.clear();
+      for (const entry of pool.values()) { resetPosterElement(entry.el); entry.el.root.remove(); }
       pool.clear(); free.length = 0; pendingMounts.length = 0; staleEntries.length = 0;
       lattice = null; tiles = []; expanded = null; focused = null; currentTile = null;
       collapsing = null; hoverId = null; focusPending = false; settlePending = false;
       needsCull = true; layoutDirty = true; culledOnce = false; lastNow = null; entrance = 'idle';
+      lastView.x = lastView.y = lastView.scale = NaN;
     },
 
     dispose() {
       if (disposed) return;
       disposed = true;
       abort.abort();
-      for (const entry of pool.values()) entry.el.root.remove();
+      coverQueue.dispose();
+      for (const entry of pool.values()) { resetPosterElement(entry.el); entry.el.root.remove(); }
       pool.clear();
       pendingMounts.length = 0;
       staleEntries.length = 0;

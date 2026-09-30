@@ -25,6 +25,7 @@ import { createControlPanel } from './controlPanel.ts';
 import { createLattice } from './geometry/lattice.ts';
 import { createSpreadLattice, reseatPlayingToSquare } from './geometry/tileSpread.ts';
 import { createCamera } from './wall/camera.ts';
+import { createWallFrameLoop, INTERACTIVE_FRAME_MS } from './wall/frameLoop.ts';
 import { attachPointerPan } from './wall/pointerPan.ts';
 import { attachKeyboardNav } from './wall/keyboardNav.ts';
 import { createPosterWall } from './wall/posterWall.ts';
@@ -42,10 +43,8 @@ const PANEL_TITLE = 'Lattice · 曲库拼贴墙';
 const FLY_MS = 420;
 const FOLLOW_FLY_MS = 520;
 const FOCUS_MARGIN_PX = 40;
-/** Hosts without vsync throttling fire rAF at several hundred Hz; skip frames closer than this (keeps 144 Hz intact). */
-const MIN_FRAME_MS = 6.5;
 
-type PanelState = 'booting' | 'ready' | 'empty' | 'denied';
+type PanelState = 'booting' | 'ready' | 'empty' | 'denied' | 'error';
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -55,6 +54,9 @@ const byId = <T extends HTMLElement>(id: string): T => {
 
 
 const start = async (): Promise<void> => {
+  const root = document.body;
+  let disposed = false;
+  const frameIntervalMs = (): number => root.dataset.dragging !== 'true' && !camera.animating ? 33 : INTERACTIVE_FRAME_MS;
   const field = byId<HTMLDivElement>('field');
   const world = byId<HTMLDivElement>('world');
   const locate = byId<HTMLButtonElement>('locate');
@@ -66,7 +68,7 @@ const start = async (): Promise<void> => {
   let state: PanelState = 'booting';
   const setState = (next: PanelState, detail?: { missing?: RequiredCapability[] }): void => {
     state = next;
-    document.body.dataset.state = next;
+    root.dataset.state = next;
     overlay.show(next, detail);
   };
 
@@ -75,6 +77,7 @@ const start = async (): Promise<void> => {
     boot = await bridge.boot();
   } catch {
     setState('denied', { missing: [] });
+    bridge.dispose();
     return;
   }
 
@@ -89,6 +92,7 @@ const start = async (): Promise<void> => {
 
   if (boot.missing.length > 0) {
     setState('denied', { missing: boot.missing });
+    bridge.dispose();
     return;
   }
 
@@ -106,6 +110,7 @@ const start = async (): Promise<void> => {
   const lyricsTransition = createLyricsTransition();
   let lyricsCache: { trackId: string; timeline: LyricsTimeline } | null = null;
   let lyricsRequest: string | null = null;
+  let lyricsOpenFrame = 0;
   let focused: Instance | null = null;
   let locateVisible = false;
 
@@ -118,11 +123,8 @@ const start = async (): Promise<void> => {
   };
 
   // ---- frame loop --------------------------------------------------------------------------------
-  let frameId = 0;
-  const requestFrame = (): void => {
-    if (frameId !== 0 || !context.visible) return;
-    frameId = requestAnimationFrame(frame);
-  };
+  const frames = createWallFrameLoop((time) => frame(time), frameIntervalMs, context.visible);
+  const requestFrame = frames.request;
 
   const setLocateVisible = (visible: boolean): void => {
     if (visible === locateVisible) return;
@@ -139,15 +141,8 @@ const start = async (): Promise<void> => {
     setLocateVisible(state === 'ready' && currentIndex !== null && !currentOnScreen);
   };
 
-  let lastFrameAt = 0;
-  const frame = (time: number): void => {
-    frameId = 0;
-    if (!wallReady) return;
-    if (time - lastFrameAt < MIN_FRAME_MS) {
-      requestFrame();
-      return;
-    }
-    lastFrameAt = time;
+  const frame = (time: number): boolean => {
+    if (!wallReady || disposed) return false;
     const cameraChanged = camera.tick(time);
     if (cameraChanged) {
       world.style.transform = camera.transform();
@@ -155,8 +150,8 @@ const start = async (): Promise<void> => {
     }
     const wallAnimating = wall.render(camera, time);
     const snapshot = clock.read(time);
-    controls.update(snapshot);
-    if (lyricsMountedFor !== null && lyricsView.needsFrames) {
+    if (wall.expandedVisible(camera)) controls.update(snapshot);
+    if (wall.expandedVisible(camera) && lyricsMountedFor !== null && lyricsView.needsFrames) {
       const rowsChanged = lyricsView.update(snapshot.positionSeconds * 1000);
       if (rowsChanged) {
         const content = wall.expandedContent();
@@ -164,7 +159,10 @@ const start = async (): Promise<void> => {
       }
     }
     updateLocate();
-    if (camera.animating || wallAnimating || (clock.running && context.visible)) requestFrame();
+    const playbackVisible = wall.expandedVisible(camera)
+      && wall.expanded?.tileIndex === currentIndex
+      && (!controls.controlsHidden || (lyricsMountedFor !== null && lyricsView.needsFrames));
+    return camera.animating || wallAnimating || (clock.running && playbackVisible);
   };
 
   // ---- lyrics ------------------------------------------------------------------------------------
@@ -177,6 +175,8 @@ const start = async (): Promise<void> => {
   };
 
   const unmountLyrics = (animate = false): void => {
+    cancelAnimationFrame(lyricsOpenFrame);
+    lyricsOpenFrame = 0;
     const content = wall.expandedContent();
     const card = content?.root.closest<HTMLElement>('.poster');
     if (animate && content && card) {
@@ -204,7 +204,7 @@ const start = async (): Promise<void> => {
       return;
     }
     lyricsView.update(clock.read(now()).positionSeconds * 1000);
-    if (open) lyricsTransition.fit(content, measureLyricsOpenHeight(card, content.lyrics, expectFollowingLyric()));
+    if (open) lyricsTransition.fit(content, measureLyricsOpenHeight(card, content.lyrics, expectFollowingLyric()), !context.reducedMotion);
     card.dataset.lyrics = String(open);
     lyricsTransition.toggle(content, open, context.reducedMotion, () => {
       if (open) fitLyricsSlot(content);
@@ -222,9 +222,11 @@ const start = async (): Promise<void> => {
     const card = content.root.closest<HTMLElement>('.poster');
     const settled = card?.dataset.settled === 'true';
     const openWhenLaidOut = (): void => {
+      if (lyricsOpenFrame || !context.visible) return;
       const tryOpen = (attempts: number): void => {
-        requestAnimationFrame(() => {
-          if (lyricsMountedFor !== expanded.id || !settings.showLyrics) return;
+        lyricsOpenFrame = requestAnimationFrame(() => {
+          lyricsOpenFrame = 0;
+          if (disposed || !context.visible || lyricsMountedFor !== expanded.id || !settings.showLyrics) return;
           if (wall.expandedContent() !== content) return;
           lyricsView.update(clock.read(now()).positionSeconds * 1000);
           if (!lyricsContentReady(content.lyrics, expectFollowingLyric()) && attempts < 24) {
@@ -258,7 +260,7 @@ const start = async (): Promise<void> => {
     if (lyricsCache?.trackId === trackId || lyricsRequest === trackId) return;
     lyricsRequest = trackId;
     void bridge.getLyrics(trackId).then((lyrics) => {
-      if (lyricsRequest !== trackId) return;
+      if (disposed || lyricsRequest !== trackId) return;
       lyricsRequest = null;
       if (currentTrackId() !== trackId && currentTile()?.trackId !== trackId) return;
       lyricsCache = { trackId, timeline: buildLyricsTimeline(lyrics) };
@@ -391,7 +393,7 @@ const start = async (): Promise<void> => {
       const tile = currentTile();
       if (tile && settings.showLyrics) ensureLyrics(tile.trackId);
     },
-    onExpandedTap: () => controls.setControlsHidden(!controls.controlsHidden),
+    onExpandedTap: () => { controls.setControlsHidden(!controls.controlsHidden); requestFrame(); },
   });
 
   let shuffleEnabled = boot.status?.shuffleEnabled === true || boot.queue?.shuffleEnabled === true;
@@ -439,6 +441,8 @@ const start = async (): Promise<void> => {
     wall.setVisualOptions(wallVisualsFromSettings(settings, context.reducedMotion));
     lyricsView.setOptions({ showTranslation: settings.showTranslation, reducedMotion: context.reducedMotion });
     if (context.reducedMotion) lyricsTransition.finish();
+    const content = wall.expandedContent();
+    if (content) fitLyricsSlot(content);
   };
 
   // ---- lattice lifecycle -------------------------------------------------------------------------
@@ -487,13 +491,19 @@ const start = async (): Promise<void> => {
 
   const enterReady = (): void => {
     if (!viewportReady || !pageLoaded || tiles.length === 0) return;
-    setState('ready');
-    rebuildLattice();
-    applyVisuals();
-    initialCamera();
-    wallReady = true;
-    wall.playEntrance(now());
-    requestFrame();
+    try {
+      rebuildLattice();
+      applyVisuals();
+      initialCamera();
+      wallReady = true;
+      setState('ready');
+      wall.playEntrance(now());
+      requestFrame();
+    } catch (error) {
+      wallReady = false;
+      setState('error');
+      console.warn('[lattice-wall] failed to render', error);
+    }
   };
 
   const applyPlayingTrack = (trackId: string | null, follow: boolean): void => {
@@ -537,7 +547,7 @@ const start = async (): Promise<void> => {
     overlayCopy('正在读取曲库', '从 ECHO 曲库加载歌曲…');
     try {
       const result = await loader.load(page, search);
-      if (!result) return;
+      if (!result || disposed) return;
       browser.update(result);
       tiles = libraryTrackTiles(result.items, result.page);
       currentIndex = currentLibraryIndex(tiles, playingTrackId);
@@ -545,7 +555,7 @@ const start = async (): Promise<void> => {
         setState('empty');
         overlayCopy(
           search ? '没有找到歌曲' : '曲库中还没有歌曲',
-          search ? '在功能面板中修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，打开功能面板并刷新。',
+          search ? '打开功能面板修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，打开功能面板并刷新。',
         );
         return;
       }
@@ -553,6 +563,7 @@ const start = async (): Promise<void> => {
       if (viewportReady) enterReady();
       overlay.setNotice(libraryPageNotice(result));
     } catch {
+      if (disposed) return;
       browser.error();
       setState('empty');
       overlayCopy('暂时无法读取曲库', '打开功能面板并刷新重试；如尚未授权，请在 Workshop → 已安装 中确认读取曲库权限。');
@@ -577,7 +588,7 @@ const start = async (): Promise<void> => {
     settings = { ...settings, ...patch };
     commitSettings(previous, patch);
   };
-  const browser = createControlPanel(byId<HTMLElement>('lattice'), {
+  const browser = createControlPanel(root.querySelector<HTMLElement>('#lattice')!, {
     wall: 'library',
     settings,
     lyrics: true,
@@ -602,12 +613,12 @@ const start = async (): Promise<void> => {
     onPan: (dx, dy) => { camera.panBy(dx, dy); requestFrame(); },
     onFling: (vx, vy) => { camera.fling(vx, vy); requestFrame(); },
     onTap: () => undefined,
-    onWheel: (dx, dy) => { camera.panBy(-dx, -dy); requestFrame(); },
-    onDragStart: () => { document.body.dataset.dragging = 'true'; },
-    onDragEnd: () => { delete document.body.dataset.dragging; },
+    onWheel: (dx, dy) => { camera.panBy(-dx, -dy); frames.requestInteractive(); },
+    onDragStart: () => { root.dataset.dragging = 'true'; },
+    onDragEnd: () => { delete root.dataset.dragging; requestFrame(); },
   });
 
-  const keyboard = attachKeyboardNav(document.body, {
+  const keyboard = attachKeyboardNav(root, {
     move: (direction) => {
       if (!lattice || !wallReady) return;
       const from = focused ?? lattice.cull(camera.bounds(), 0, wall.expanded, 1)[0];
@@ -632,7 +643,10 @@ const start = async (): Promise<void> => {
     },
     secondary: () => {
       if (!focused) { focusCurrent(FLY_MS); return; }
-      if (wall.expanded && wall.expanded.id === focused.id) controls.setControlsHidden(!controls.controlsHidden);
+      if (wall.expanded && wall.expanded.id === focused.id) {
+        controls.setControlsHidden(!controls.controlsHidden);
+        requestFrame();
+      }
       else expand(focused);
     },
     escape: () => {
@@ -682,15 +696,19 @@ const start = async (): Promise<void> => {
       requestFrame();
     }),
     echo.events.on('library:changed', () => {
-      overlay.setNotice('曲库已更新，打开功能面板并刷新');
+      overlay.setNotice('曲库已更新，打开功能面板即可刷新');
     }),
     bridge.onContextChanged((next) => {
-      const wasVisible = context.visible;
       const reducedChanged = next.reducedMotion !== context.reducedMotion;
       context = next;
       applyContext(next);
       if (reducedChanged) applyVisuals();
-      if (!wasVisible && next.visible) requestFrame();
+      frames.setVisible(next.visible);
+      if (next.visible) mountExpandedUi();
+      else {
+        cancelAnimationFrame(lyricsOpenFrame);
+        lyricsOpenFrame = 0;
+      }
     }),
     bridge.onSettingsChanged((values) => {
       const previous = settings;
@@ -719,7 +737,19 @@ const start = async (): Promise<void> => {
   resize.observe(field);
   void loadPage(1, '');
 
-  window.addEventListener('pagehide', () => {
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
+    wallReady = false;
+    frames.dispose();
+    cancelAnimationFrame(lyricsOpenFrame);
+    lyricsOpenFrame = 0;
+    window.removeEventListener('pagehide', dispose);
+    lyricsRequest = null;
+    lyricsCache = null;
+    lyricsMountedFor = null;
+    camera.stop();
+    lattice = null;
     for (const stop of unsubscribe) stop();
     locate.removeEventListener('click', onLocate);
     pointer.dispose();
@@ -733,7 +763,8 @@ const start = async (): Promise<void> => {
     lyricsView.dispose();
     bridge.dispose();
     tiles = [];
-  }, { once: true });
+  };
+  window.addEventListener('pagehide', dispose, { once: true });
 };
 
 void start();

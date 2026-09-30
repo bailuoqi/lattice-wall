@@ -1,7 +1,7 @@
 import type { RequiredCapability } from './types.ts';
 
 export type StateOverlay = {
-  show(state: 'booting' | 'ready' | 'empty' | 'denied', detail?: { missing?: RequiredCapability[] }): void;
+  show(state: 'booting' | 'ready' | 'empty' | 'denied' | 'error', detail?: { missing?: RequiredCapability[] }): void;
   /** Small persistent chip at the bottom (e.g. the 500-item truncation hint); null hides it. */
   setNotice(text: string | null): void;
 };
@@ -43,6 +43,10 @@ export const createStateOverlay = (container: HTMLElement, host: HTMLElement): S
       }
       if (state === 'empty') {
         container.append(...message('曲库中还没有歌曲', '在 ECHO 中导入音乐后，打开功能面板并刷新。'));
+        return;
+      }
+      if (state === 'error') {
+        container.append(...message('拼贴墙加载失败', '请关闭拼贴墙后重试。'));
         return;
       }
       const missing = detail?.missing ?? [];

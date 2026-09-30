@@ -6,6 +6,7 @@ const VELOCITY_WINDOW_MS = 80;
 /** Two samples closer than this are release jitter, not a flick. */
 const MIN_VELOCITY_SPAN_MS = 8;
 const SAMPLE_CAPACITY = 8;
+const SAMPLE_INTERVAL_MS = 10;
 const CLICK_SUPPRESSION_MS = 300;
 const LINE_DELTA_PX = 16;
 /** Controls inside expanded cards keep their native pointer behaviour and their clicks. */
@@ -34,6 +35,8 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
   let lastX = 0;
   let lastY = 0;
   let dragging = false;
+  let rawAttached = false;
+  let rawSeen = false;
 
   const sampleTimes = new Float64Array(SAMPLE_CAPACITY);
   const sampleXs = new Float64Array(SAMPLE_CAPACITY);
@@ -45,6 +48,16 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
   let suppressTimer: ReturnType<typeof setTimeout> | null = null;
 
   function pushSample(time: number, x: number, y: number): void {
+    // High-polling mice must not fill the entire velocity window with < 8 ms of samples.
+    // Keep the latest endpoint while retaining history in the existing fixed-size ring.
+    if (sampleCount > 1) {
+      const previous = (sampleHead + SAMPLE_CAPACITY - 2) % SAMPLE_CAPACITY;
+      if (time - at(sampleTimes, previous) < SAMPLE_INTERVAL_MS) {
+        const newest = (sampleHead + SAMPLE_CAPACITY - 1) % SAMPLE_CAPACITY;
+        sampleTimes[newest] = time; sampleXs[newest] = x; sampleYs[newest] = y;
+        return;
+      }
+    }
     sampleTimes[sampleHead] = time;
     sampleXs[sampleHead] = x;
     sampleYs[sampleHead] = y;
@@ -86,6 +99,9 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
   }
 
   function endGesture(): void {
+    if (rawAttached) field.removeEventListener('pointerrawupdate', onRawUpdate);
+    rawAttached = false;
+    rawSeen = false;
     activePointerId = null;
     downTarget = null;
     dragging = false;
@@ -103,9 +119,27 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
     sampleHead = 0;
     sampleCount = 0;
     pushSample(event.timeStamp, event.clientX, event.clientY);
+    // Only subscribe during a gesture; raw input updates the target while the wall's
+    // existing rAF owner still coalesces all DOM work into one frame.
+    if (field.ownerDocument.defaultView && 'onpointerrawupdate' in field.ownerDocument.defaultView) {
+      field.addEventListener('pointerrawupdate', onRawUpdate, { passive: true });
+      rawAttached = true;
+    }
   }
 
   function onPointerMove(event: PointerEvent): void {
+    // Once raw events arrive, the delayed/coalesced pointermove repeats their movement.
+    if (!rawSeen) movePointer(event);
+  }
+
+  function onRawUpdate(event: Event): void {
+    const pointer = event as PointerEvent;
+    if (pointer.pointerId !== activePointerId) return;
+    rawSeen = true;
+    movePointer(pointer);
+  }
+
+  function movePointer(event: PointerEvent): void {
     if (event.pointerId !== activePointerId) return;
     const x = event.clientX;
     const y = event.clientY;

@@ -4,8 +4,9 @@ import { applyContext } from '../host/context.ts';
 import { createPlaybackClock } from '../host/clock.ts';
 import { applyAppearance, cellMetricsFor, resolveSettings, settingEntries, wallExpandedScale, wallOverviewScale, wallVisualsFromSettings } from '../host/settings.ts';
 import { createLattice } from '../geometry/lattice.ts';
-import { reseatPlayingToSquare } from '../geometry/tileSpread.ts';
+import { createSpreadLattice, reseatPlayingToSquare } from '../geometry/tileSpread.ts';
 import { createCamera } from '../wall/camera.ts';
+import { createWallFrameLoop, INTERACTIVE_FRAME_MS } from '../wall/frameLoop.ts';
 import { createPosterWall } from '../wall/posterWall.ts';
 import { attachPointerPan } from '../wall/pointerPan.ts';
 import { attachKeyboardNav } from '../wall/keyboardNav.ts';
@@ -30,9 +31,19 @@ async function start(): Promise<void> {
   };
   document.addEventListener('keydown', earlyExit);
   const boot = await bridge.boot().catch(() => null);
-  if (!boot) { overlay.show('denied'); return; }
+  if (!boot) {
+    document.removeEventListener('keydown', earlyExit);
+    overlay.show('denied');
+    bridge.dispose();
+    return;
+  }
   applyContext(boot.context);
-  if (boot.missing.length) { overlay.show('denied', { missing: [...new Set(boot.missing)] }); return; }
+  if (boot.missing.length) {
+    document.removeEventListener('keydown', earlyExit);
+    overlay.show('denied', { missing: [...new Set(boot.missing)] });
+    bridge.dispose();
+    return;
+  }
   document.removeEventListener('keydown', earlyExit);
   let context = boot.context;
   let settings = resolveSettings(boot.settings);
@@ -45,7 +56,6 @@ async function start(): Promise<void> {
   let lattice: Lattice | null = null;
   let ready = false, disposed = false;
   let mounted: string | null = null;
-  let frameId = 0, lastFrame = 0;
   let shuffleEnabled = boot.status?.shuffleEnabled === true || boot.queue?.shuffleEnabled === true;
   let repeatOne = boot.status?.repeatMode === 'one' || boot.queue?.repeatMode === 'one';
   const camera = createCamera();
@@ -57,9 +67,9 @@ async function start(): Promise<void> {
     else void bridge.play();
   };
   const details = createAlbumDetails(echo, {
-    playAlbum: () => undefined,
-    getLyrics: (id) => bridge.getLyrics(id),
+    getLyrics: id => bridge.getLyrics(id),
     readClock: () => clock.read(now()),
+    playAlbum: () => undefined,
     play: () => void bridge.play(),
     pause: () => void bridge.pause(),
     togglePlay,
@@ -68,6 +78,7 @@ async function start(): Promise<void> {
     seek: (position) => {
       clock.seek(position, now());
       void bridge.seek(position);
+      requestFrame();
     },
     toggleShuffle: () => {
       shuffleEnabled = !shuffleEnabled;
@@ -83,23 +94,21 @@ async function start(): Promise<void> {
   details.setShuffleEnabled(shuffleEnabled);
   details.setRepeatOne(repeatOne);
   const loader = createPageLoader(query => echo.library.getAlbums(query), ALBUM_PAGE_SIZE);
-  const requestFrame = () => {
-    if (!frameId && !disposed && context.visible) frameId = requestAnimationFrame(frame);
-  };
+  const frameIntervalMs = (): number => document.body.dataset.dragging !== 'true'
+    && !camera.animating ? 33 : INTERACTIVE_FRAME_MS;
+  const frames = createWallFrameLoop(frame, frameIntervalMs, context.visible);
+  const requestFrame = frames.request;
   const updateLocate = () => {
     locate.dataset.visible = String(ready && current !== null && (wall.expanded?.tileIndex !== current || !wall.expandedVisible(camera)));
   };
-  function frame(time: number) {
-    frameId = 0;
-    if (!ready || disposed || !context.visible) return;
-    if (time - lastFrame < 6.5) { requestFrame(); return; }
-    lastFrame = time;
+  function frame(time: number): boolean {
+    if (!ready || disposed) return false;
     if (camera.tick(time)) world.style.transform = camera.transform();
     const moving = wall.render(camera, time);
     mountDetails();
-    if (isExpandedCurrent()) details.updateClock(clock.read(time));
+    if (isExpandedCurrent() && wall.expandedVisible(camera)) details.updateClock(clock.read(time));
     updateLocate();
-    if (moving || camera.animating || clock.running) requestFrame();
+    return moving || camera.animating || (clock.running && isExpandedCurrent() && details.clockVisible && wall.expandedVisible(camera));
   }
   function mountDetails() {
     const instance = wall.expanded;
@@ -110,9 +119,8 @@ async function start(): Promise<void> {
     const currentAlbum = current !== null && instance.tileIndex === current;
     details.mount(content, album, currentAlbum);
     details.updateCurrent(track?.id ?? null, currentAlbum);
-    content.root.style.setProperty('--album-scale', String(fitScale()));
+    content.root.style.setProperty('--album-scale', String(wallExpandedScale(camera.viewport.width)));
   }
-  const fitScale = () => Math.min(1, Math.min(camera.viewport.width, camera.viewport.height) * .94 / (6 * lattice!.unit - lattice!.metrics.gap));
   function reseatPlayingNear(near: Point): void {
     if (!lattice || current === null || tiles.length === 0) return;
     const playingAt = lattice.nearestInstance(current, near, null);
@@ -180,13 +188,13 @@ async function start(): Promise<void> {
     onActivate: expand,
     onFocusChange: () => undefined,
     onExpandSettled: mountDetails,
-    onExpandedTap: () => details.toggle(),
+    onExpandedTap: () => { details.toggle(); requestFrame(); },
     onHoverCurrent: () => undefined,
   });
   const visuals = () => {
     applyAppearance(settings);
-    wall.setVisualOptions(wallVisualsFromSettings(settings, context.reducedMotion));
     details.setLyricsOptions({ showTranslation: settings.showTranslation, reducedMotion: context.reducedMotion });
+    wall.setVisualOptions(wallVisualsFromSettings(settings, context.reducedMotion));
   };
   const commitSettings = (previous: LatticeSettings, persist: Partial<LatticeSettings> | null): void => {
     visuals();
@@ -210,7 +218,7 @@ async function start(): Promise<void> {
   };
   const rebuild = () => {
     if (!tiles.length) return;
-    lattice = createLattice(tiles.length, cellMetricsFor(settings.cellSize));
+    lattice = createSpreadLattice(tiles, cellMetricsFor(settings.cellSize));
     wall.setLattice(lattice, tiles); wall.setCurrent(current); visuals(); requestFrame();
   };
   // Paging reuses the renderer while dropping old tile references and mounted cards via clear().
@@ -234,7 +242,7 @@ async function start(): Promise<void> {
       overlay.show(ready ? 'ready' : 'empty');
       if (!ready) {
         state.querySelector('h2')!.textContent = search ? '没有找到专辑' : '曲库中还没有专辑';
-        state.querySelector('p')!.textContent = search ? '在功能面板中修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，打开功能面板并刷新。';
+        state.querySelector('p')!.textContent = search ? '打开功能面板修改关键词，或清空搜索。' : '在 ECHO 中导入音乐后，打开功能面板并刷新。';
         return;
       }
       rebuild();
@@ -274,10 +282,10 @@ async function start(): Promise<void> {
   const pointer = attachPointerPan(field, {
     onPan: (x, y) => { camera.panBy(x, y); requestFrame(); },
     onFling: (x, y) => { camera.fling(x, y); requestFrame(); },
-    onWheel: (x, y) => { camera.panBy(-x, -y); requestFrame(); },
+    onWheel: (x, y) => { camera.panBy(-x, -y); frames.requestInteractive(); },
     onTap: () => undefined,
     onDragStart: () => { document.body.dataset.dragging = 'true'; },
-    onDragEnd: () => { delete document.body.dataset.dragging; },
+    onDragEnd: () => { delete document.body.dataset.dragging; requestFrame(); },
   });
   const keyboard = attachKeyboardNav(document.body, {
     move: direction => {
@@ -302,7 +310,7 @@ async function start(): Promise<void> {
         return;
       }
       if (isExpandedCurrent()) togglePlay();
-      else details.toggle();
+      else { details.toggle(); requestFrame(); }
     },
     escape: () => { if (wall.expanded) collapse(); else void bridge.closePanel(); },
     focusCurrent,
@@ -347,7 +355,7 @@ async function start(): Promise<void> {
       }
       requestFrame();
     }),
-    bridge.onContextChanged(next => { context = next; applyContext(next); visuals(); requestFrame(); }),
+    bridge.onContextChanged(next => { context = next; applyContext(next); visuals(); frames.setVisible(next.visible); }),
     bridge.onSettingsChanged(values => {
       const previous = settings;
       settings = resolveSettings(values);
@@ -355,7 +363,7 @@ async function start(): Promise<void> {
     }),
   ];
   stop.push(echo.events.on('library:changed', () => {
-    overlay.setNotice('曲库已更新，打开功能面板并刷新');
+    overlay.setNotice('曲库已更新，打开功能面板即可刷新');
   }));
   const resize = new ResizeObserver(entries => {
     const rect = entries[0]?.contentRect;
@@ -365,7 +373,7 @@ async function start(): Promise<void> {
       camera.setScale((wall.expanded ? wallExpandedScale : wallOverviewScale)(rect.width));
     }
     if (wall.expanded) {
-      wall.expandedContent()?.root.style.setProperty('--album-scale', String(fitScale()));
+      wall.expandedContent()?.root.style.setProperty('--album-scale', String(wallExpandedScale(rect.width)));
     }
     world.style.transform = camera.transform(); requestFrame();
   });
@@ -376,13 +384,17 @@ async function start(): Promise<void> {
   }
   visuals();
   void loadPage(1, '');
-  window.addEventListener('pagehide', () => {
-    disposed = true; cancelAnimationFrame(frameId); loader.cancel();
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true; frames.dispose(); loader.cancel(); camera.stop();
+    window.removeEventListener('pagehide', dispose);
+    lattice = null;
     for (const off of stop) off();
     locate.removeEventListener('click', focusCurrent);
     resize.disconnect(); pointer.dispose(); keyboard.dispose(); browser.dispose();
     details.dispose(); wall.dispose(); bridge.dispose(); albums = []; tiles = [];
-  }, { once: true });
+  };
+  window.addEventListener('pagehide', dispose, { once: true });
 }
 
 void start();

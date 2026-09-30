@@ -2,7 +2,7 @@ import type { RequiredCapability, Tile } from '../types.ts';
 import { FALLBACK_ARTIST, FALLBACK_TITLE } from './queueModel.ts';
 
 /** Tracks shown on one wall. Above this, the browser pages; the host still serves at most 100 per call. */
-export const LIBRARY_WALL_PAGE_SIZE = 800;
+export const LIBRARY_WALL_PAGE_SIZE = 200;
 /** Host `library:getTracks` cap (`WorkshopPluginMediaBridge.maximumPageSize`). */
 export const LIBRARY_HOST_PAGE_SIZE = 100;
 /** Host `queue.playTrack` accepts at most this many context ids. */
@@ -68,7 +68,7 @@ export function playContextIds(tiles: readonly Tile[], centerIndex: number, limi
 
 /**
  * Assembles one wall page from several host pages. Stops early when the library (or search)
- * has fewer than 800 remaining tracks. Only the current wall page is retained.
+ * has fewer than 200 remaining tracks. Only the current wall page is retained.
  */
 export function createLibraryTrackLoader(
   read: (query: EchoWorkshopPageQuery) => Promise<EchoWorkshopPage<EchoWorkshopTrack>>,
@@ -83,11 +83,17 @@ export function createLibraryTrackLoader(
       let total = 0;
 
       for (let step = 0; step < HOST_PAGES_PER_WALL; step++) {
-        const result = await read({
-          page: hostStart + step,
-          pageSize: LIBRARY_HOST_PAGE_SIZE,
-          search,
-        });
+        let result: EchoWorkshopPage<EchoWorkshopTrack>;
+        try {
+          result = await read({
+            page: hostStart + step,
+            pageSize: LIBRARY_HOST_PAGE_SIZE,
+            search,
+          });
+        } catch (error) {
+          if (request !== generation) return null;
+          throw error;
+        }
         if (request !== generation) return null;
         total = result.total;
         items.push(...result.items.slice(0, LIBRARY_HOST_PAGE_SIZE));

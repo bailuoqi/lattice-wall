@@ -5,6 +5,7 @@
  */
 
 import type { ExpandedContent, GridRect, PixelRect, Tile } from '../types.ts';
+import { createCoverSwapQueue, createPosterCover, type CoverSwapQueue, type PosterCover } from './posterCover.ts';
 
 export const ENTRANCE_STEP_SECONDS = 0.034;
 export const ENTRANCE_MAX_SECONDS = 0.34;
@@ -79,6 +80,7 @@ export type PosterElement = {
   readonly root: HTMLElement;
   readonly body: HTMLElement;
   readonly cover: HTMLImageElement;
+  readonly coverLoader: PosterCover;
   readonly fallback: HTMLElement;
   readonly caption: HTMLElement;
   readonly captionTitle: HTMLElement;
@@ -90,10 +92,9 @@ export type PosterElement = {
   readonly shown: {
     /** The tile's cover URL (host thumb variant). */
     coverUrl: string | null;
-    /** The URL actually written to the <img>; a size-appropriate variant of `coverUrl`. */
-    coverSrc: string | null;
     /** Card box in CSS px (target rect, not spring frames); picks the cover variant with the expanded state. */
     box: { w: number; h: number };
+    scale: number;
     trackId: string | null;
     label: string;
     current: boolean;
@@ -122,45 +123,37 @@ export function coverVariantUrl(url: string, variant: CoverVariant): string {
   return LOCAL_COVER_VARIANT.test(url) ? url.replace(LOCAL_COVER_VARIANT, `echo-cover://${variant}/`) : url;
 }
 
-/**
- * Smallest variant that still covers the card at roughly 1:1 device pixels: `album` for the small cards,
- * `large` for everything bigger and for the expanded card. Chromium decodes the WebP variants scaled to
- * the drawn size, so an occasional oversized `large` file does not cost its full resolution in memory.
- */
-export function coverVariantFor(box: { w: number; h: number }, expanded: boolean, devicePixelRatio = 1): CoverVariant {
-  if (expanded) return 'large';
-  return Math.max(box.w, box.h) * devicePixelRatio > ALBUM_VARIANT_MAX_DEVICE_PX ? 'large' : 'album';
+/** Select from displayed pixels, retaining the large variant near the boundary to avoid churn. */
+export function coverVariantFor(
+  box: { w: number; h: number }, _expanded: boolean, devicePixelRatio = 1, scale = 1, previous?: CoverVariant,
+): CoverVariant {
+  const pixels = Math.max(box.w, box.h) * devicePixelRatio * scale;
+  const threshold = previous === 'large' ? ALBUM_VARIANT_MAX_DEVICE_PX * 0.85 : ALBUM_VARIANT_MAX_DEVICE_PX;
+  return pixels > threshold ? 'large' : 'album';
 }
 
-function syncCover(el: PosterElement): void {
+/** Budgeted after geometry settles; the wall also limits temporary decode-and-swap work. */
+export function syncPosterCover(el: PosterElement, commit = true): boolean {
   const base = el.shown.coverUrl;
   const dpr = typeof globalThis.devicePixelRatio === 'number' ? globalThis.devicePixelRatio : 1;
-  const src = base === null ? null : coverVariantUrl(base, coverVariantFor(el.shown.box, el.expanded !== null, dpr));
-  if (src === el.shown.coverSrc) return;
-  el.shown.coverSrc = src;
-  if (src) {
-    el.cover.src = src;
-    el.cover.hidden = false;
-  } else {
-    el.cover.hidden = true;
-    el.cover.removeAttribute('src');
-  }
+  const previous = el.coverLoader.source?.startsWith('echo-cover://large/') ? 'large' : undefined;
+  const src = base === null ? null : coverVariantUrl(base,
+    coverVariantFor(el.shown.box, el.expanded !== null, dpr, el.shown.scale, previous));
+  if (el.coverLoader.matches(src)) return false;
+  if (!commit) return true;
+  el.coverLoader.request(src, base);
+  return true;
 }
 
-export function createPosterElement(): PosterElement {
+export function createPosterElement(coverQueue: CoverSwapQueue = createCoverSwapQueue()): PosterElement {
   const root = document.createElement('article');
   root.className = 'poster';
   root.setAttribute('role', 'button');
   root.tabIndex = -1;
 
   const body = createDiv('poster__body');
-  const cover = document.createElement('img');
-  cover.className = 'poster__cover';
-  cover.loading = 'lazy';
-  cover.decoding = 'async';
-  cover.alt = '';
-  cover.draggable = false;
-  cover.hidden = true;
+  const coverLoader = createPosterCover(coverQueue);
+  const cover = coverLoader.image;
   const fallback = createDiv('poster__fallback');
   // The fallback precedes the cover so the image paints above the gradient in plain DOM order.
   body.append(fallback, cover, createDiv('poster__shade'), createDiv('poster__tint'), createDiv('poster__lights'));
@@ -169,39 +162,34 @@ export function createPosterElement(): PosterElement {
   const captionArtist = createDiv('poster__caption-artist');
   caption.append(captionTitle, captionArtist);
   caption.hidden = true;
+  // The card already exposes the full title and artist through its accessible label.
   caption.setAttribute('aria-hidden', 'true');
   root.append(body, caption);
 
   const el: PosterElement = {
     root,
     body,
-    cover,
+    get cover() { return coverLoader.image; },
+    coverLoader,
     fallback,
     caption,
     captionTitle,
     captionArtist,
     rect: { x: NaN, y: NaN, w: NaN, h: NaN },
     expanded: null,
-    shown: { coverUrl: null, coverSrc: null, box: { w: 0, h: 0 }, trackId: null, label: '', current: false, hoverGap: NaN },
+    shown: { coverUrl: null, box: { w: 0, h: 0 }, scale: 1, trackId: null, label: '', current: false, hoverGap: NaN },
   };
-  // A missing mid-size variant falls back to the thumb the host actually vouched for.
-  cover.addEventListener('error', () => {
-    const base = el.shown.coverUrl;
-    if (base !== null && el.shown.coverSrc !== base) {
-      el.shown.coverSrc = base;
-      cover.src = base;
-    }
-  });
   return el;
 }
 
-/** Records the card's target box (CSS px) so the cover variant matches it; cheap when unchanged. */
-export function applyCardBox(el: PosterElement, box: { w: number; h: number }, refreshCover = true): void {
+/** Record target size; image selection is deferred until geometry settles. */
+export function applyCardBox(el: PosterElement, box: { w: number; h: number }): void {
   const shown = el.shown;
   if (shown.box.w === box.w && shown.box.h === box.h) return;
   shown.box = { w: box.w, h: box.h };
+  // Reserve the bottom inset and artist line; short cards show fewer title lines.
   el.root.style.setProperty('--caption-lines', String(Math.max(1, Math.min(3, Math.floor((box.h - 50) / 35.2)))));
-  if (refreshCover) syncCover(el);
+  // Cover changes are flushed with a separate per-frame budget after motion settles.
 }
 
 export function applyTile(el: PosterElement, tile: Tile | undefined, isCurrent: boolean): void {
@@ -211,8 +199,8 @@ export function applyTile(el: PosterElement, tile: Tile | undefined, isCurrent: 
   if (coverUrl !== shown.coverUrl) {
     shown.coverUrl = coverUrl;
     el.root.dataset.squareCover = String(coverUrl !== null && LOCAL_COVER_VARIANT.test(coverUrl));
+    syncPosterCover(el);
   }
-  syncCover(el);
 
   const trackId = tile ? tile.trackId : null;
   if (trackId !== shown.trackId) {
@@ -248,18 +236,19 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-export function applyRect(el: PosterElement, rect: PixelRect, gap: number): void {
+export function applyRect(el: PosterElement, rect: PixelRect, gap: number, moving = false): void {
   const last = el.rect;
   const style = el.root.style;
   const x = round2(rect.x);
   const y = round2(rect.y);
-  const w = round2(rect.w);
-  const h = round2(rect.h);
+  // Whole-pixel sizes avoid a layout on every subpixel spring tail; the settled write is exact.
+  const w = moving ? Math.round(rect.w) : round2(rect.w);
+  const h = moving ? Math.round(rect.h) : round2(rect.h);
 
   if (x !== last.x || y !== last.y) {
     last.x = x;
     last.y = y;
-    style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    style.transform = `translate(${x}px, ${y}px)`;
   }
   let sizeChanged = false;
   if (w !== last.w) {
@@ -273,6 +262,7 @@ export function applyRect(el: PosterElement, rect: PixelRect, gap: number): void
     style.height = `${h}px`;
   }
   if (sizeChanged || gap !== el.shown.hoverGap) {
+    // Local thumbnails are square crops; keep the same crop when the full-aspect large image arrives.
     style.setProperty('--cover-side', `${Math.max(w, h)}px`);
     el.shown.hoverGap = gap;
     const scale = hoverScale(last, gap);
@@ -304,7 +294,6 @@ export function buildExpandedContent(el: PosterElement, tile: Tile | undefined):
     root.append(meta, controls, lyrics);
     el.root.append(root);
     el.expanded = { root, meta, controls, lyrics };
-    syncCover(el);
   }
   fillMeta(el.expanded, tile);
   el.root.setAttribute('role', 'group');
@@ -318,7 +307,6 @@ export function removeExpandedContent(el: PosterElement): void {
   el.expanded.root.remove();
   el.expanded = null;
   el.root.setAttribute('role', 'button');
-  syncCover(el);
   if (!restore) return;
   // Keep DOM focus on the field after collapse so a leftover card focus cannot look selected.
   if (el.root.dataset.expanded === 'true') {
@@ -353,11 +341,7 @@ export function resetPosterElement(el: PosterElement): void {
     el.shown.current = false;
     delete el.root.dataset.current;
   }
-  if (el.shown.coverUrl !== null || el.shown.coverSrc !== null) {
-    el.shown.coverUrl = null;
-    el.shown.coverSrc = null;
-    el.cover.hidden = true;
-    el.cover.removeAttribute('src');
-  }
+  el.shown.coverUrl = null;
+  el.coverLoader.clear();
   el.shown.box = { w: 0, h: 0 };
 }
