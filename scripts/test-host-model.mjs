@@ -287,6 +287,8 @@ test('resolveSettings: reads manifest ids and validates ranges', () => {
   const resolved = resolveSettings({
     [SETTING_IDS.immersive]: false,
     [SETTING_IDS.autoFocus]: false,
+    [SETTING_IDS.fisheye]: true,
+    [SETTING_IDS.pointer3d]: true,
     [SETTING_IDS.vignette]: false,
     [SETTING_IDS.lightsOut]: true,
     [SETTING_IDS.posterTint]: false,
@@ -299,7 +301,7 @@ test('resolveSettings: reads manifest ids and validates ranges', () => {
   });
   assert.deepEqual(resolved, {
     controlPanelShortcut: 'Ctrl+Space', showTitles: false, posterTintGradient: 'none',
-    immersive: false, autoFocus: false, lightingMode: 'spotlight', vignette: false, lightsOut: true, posterTint: false,
+    immersive: false, autoFocus: false, fisheye: true, pointer3d: true, hudTiltAngle: 5.8, lightingMode: 'spotlight', vignette: false, lightsOut: true, posterTint: false,
     posterTintCustom: true, posterTintColor: '#abcdef', posterTintIntensity: 0.75, cellSize: 'L', showLyrics: false,
     showTranslation: false, uiFont: '',
   });
@@ -308,11 +310,13 @@ test('resolveSettings: reads manifest ids and validates ranges', () => {
   assert.equal(resolveSettings({ 'poster-tint-intensity': Number.NaN }).posterTintIntensity, 0.5);
   assert.equal(resolveSettings({ 'poster-tint-color': '#abc' }).posterTintColor, '#000000', 'short hex is not a valid manifest colour');
   assert.equal(resolveSettings({ 'cell-size': 'S' }).cellSize, 'S');
+  assert.equal(resolveSettings({ fisheye: 'true' }).fisheye, false);
+  assert.equal(resolveSettings({ 'pointer-3d': 'true' }).pointer3d, false);
 });
 
 test('SETTING_IDS covers every manifest setting id exactly once', () => {
   assert.deepEqual(Object.values(SETTING_IDS).sort(), [
-    'auto-focus', 'cell-size', 'control-panel-shortcut', 'immersive', 'lighting-mode', 'lights-out', 'poster-tint', 'poster-tint-color',
+    'auto-focus', 'cell-size', 'control-panel-shortcut', 'fisheye', 'hud-tilt-angle', 'immersive', 'lighting-mode', 'lights-out', 'pointer-3d', 'poster-tint', 'poster-tint-color',
     'poster-tint-custom', 'poster-tint-gradient', 'poster-tint-intensity', 'show-lyrics', 'show-titles', 'show-translation', 'ui-font', 'vignette',
   ]);
 });
@@ -334,6 +338,7 @@ test('sanitizeUiFont rejects injection and keeps a short stack', () => {
 test('wallVisualsFromSettings: daytime turns off shade, tint and vignette', () => {
   const daytime = wallVisualsFromSettings({ ...DEFAULT_SETTINGS, lightingMode: 'daytime', lightsOut: true }, false);
   assert.deepEqual(daytime, {
+    pointer3d: false, hudTiltAngle: 5.8,
     lightsOut: false, vignette: false, tint: false, tintGradient: 'none', tintColor: '#000000', tintIntensity: 0, reducedMotion: false,
   });
   const spotlight = wallVisualsFromSettings({ ...DEFAULT_SETTINGS, lightsOut: true }, true);
@@ -344,9 +349,11 @@ test('wallVisualsFromSettings: daytime turns off shade, tint and vignette', () =
 });
 
 test('settingEntries maps runtime keys to manifest ids', () => {
-  assert.deepEqual(settingEntries({ lightingMode: 'daytime', uiFont: 'Georgia, serif' }), [
+  assert.deepEqual(settingEntries({ lightingMode: 'daytime', uiFont: 'Georgia, serif', fisheye: true, pointer3d: true }), [
     ['lighting-mode', 'daytime'],
     ['ui-font', 'Georgia, serif'],
+    ['fisheye', true],
+    ['pointer-3d', true],
   ]);
 });
 

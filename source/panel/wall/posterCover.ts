@@ -1,7 +1,7 @@
 type SwapJob = { start: (done: () => void) => () => void; cancel: (() => void) | null };
 
 /** Shared queue for at most two temporary decoded size replacements. */
-export function createCoverSwapQueue() {
+export function createCoverSwapQueue(onChanged: () => void = () => {}) {
   const waiting = new Set<SwapJob>();
   const active = new Set<SwapJob>();
   let disposed = false;
@@ -12,6 +12,7 @@ export function createCoverSwapQueue() {
       waiting.delete(job); active.add(job);
       job.cancel = job.start(() => {
         active.delete(job); job.cancel = null; pump();
+        onChanged();
       });
       if (!active.has(job)) { job.cancel?.(); job.cancel = null; }
     }
@@ -49,6 +50,7 @@ function createImage(): HTMLImageElement {
   const image = document.createElement('img');
   image.className = 'poster__cover';
   image.loading = 'eager'; image.decoding = 'async';
+  image.crossOrigin = 'anonymous';
   image.alt = ''; image.draggable = false; image.hidden = true;
   return image;
 }

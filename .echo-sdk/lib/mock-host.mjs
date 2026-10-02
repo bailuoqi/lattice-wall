@@ -135,6 +135,7 @@ export const createMockEcho = (packageValue, networkHosts = [], hostState = {}) 
     'library:liked-changed': 'library:read',
     'settings:changed': 'fs:plugin',
   };
+  let playbackRate = 1;
   const emptyPage = { page: 1, pageSize: 20, total: 0, hasMore: false, items: [] };
   const storage = new Map();
   const storageKeyPattern = /^(?!__)[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
@@ -234,12 +235,21 @@ export const createMockEcho = (packageValue, networkHosts = [], hostState = {}) 
     },
     metadata: { registerProvider: (id, definition, handler) => registrations.metadata.set(id, { definition, handler }) },
     covers: { registerProvider: (id, definition, handler) => registrations.covers.set(id, { definition, handler }) },
+    window: {
+      getDesktopWall: guarded('window:desktop-wall', async () => ({ supported: false, enabled: false })),
+      setDesktopWall: guarded('window:desktop-wall', async () => { throw new Error('command-unavailable'); }),
+    },
     navigation: { open: guarded('navigation', async () => null) },
     playback: {
       getStatus: guarded('playback:read', async () => ({
         state: 'playing', currentTrackId: fixtureTrack.id, positionSeconds: 42.5,
-        durationSeconds: fixtureTrack.durationSeconds, volume: 0.72, shuffleEnabled: false, repeatMode: 'off',
+        durationSeconds: fixtureTrack.durationSeconds, volume: 0.72, playbackRate, shuffleEnabled: false, repeatMode: 'off',
       })),
+      getRate: guarded('playback:read', async () => playbackRate),
+      setRate: guarded('playback:control', async rate => {
+        if (typeof rate !== 'number' || !Number.isFinite(rate) || rate < 0.5 || rate > 2) throw new Error('invalid-payload');
+        playbackRate = rate; return rate;
+      }),
       play: guarded('playback:control', async () => null),
       pause: guarded('playback:control', async () => null),
       seek: guarded('playback:control', async () => null),

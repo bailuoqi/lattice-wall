@@ -1,4 +1,5 @@
 import { applyContext } from './host/context.ts';
+import type { WallHostApi } from './host/api.ts';
 import type {
   BootData,
   Camera,
@@ -25,6 +26,7 @@ import { createControlPanel } from './controlPanel.ts';
 import { createLattice } from './geometry/lattice.ts';
 import { createSpreadLattice, reseatPlayingToSquare } from './geometry/tileSpread.ts';
 import { createCamera } from './wall/camera.ts';
+import { projectedCardBounds } from './wall/fisheye.ts';
 import { createWallFrameLoop, INTERACTIVE_FRAME_MS } from './wall/frameLoop.ts';
 import { attachPointerPan } from './wall/pointerPan.ts';
 import { attachKeyboardNav } from './wall/keyboardNav.ts';
@@ -53,10 +55,11 @@ const byId = <T extends HTMLElement>(id: string): T => {
 };
 
 
-const start = async (): Promise<void> => {
+export const startLatticeLibraryWall = async (echo: WallHostApi, signal?: AbortSignal): Promise<() => void> => {
   const root = document.body;
   let disposed = false;
-  const frameIntervalMs = (): number => root.dataset.dragging !== 'true' && !camera.animating ? 33 : INTERACTIVE_FRAME_MS;
+  let wallAnimating = false;
+  const frameIntervalMs = (): number => root.dataset.dragging !== 'true' && !camera.animating && !wallAnimating ? 33 : INTERACTIVE_FRAME_MS;
   const field = byId<HTMLDivElement>('field');
   const world = byId<HTMLDivElement>('world');
   const locate = byId<HTMLButtonElement>('locate');
@@ -76,10 +79,12 @@ const start = async (): Promise<void> => {
   try {
     boot = await bridge.boot();
   } catch {
-    setState('denied', { missing: [] });
+    if (!signal?.aborted) setState('denied', { missing: [] });
     bridge.dispose();
-    return;
+    return () => undefined;
   }
+
+  if (signal?.aborted) { bridge.dispose(); return () => undefined; }
 
   applyContext(boot.context);
   let context = boot.context;
@@ -93,7 +98,7 @@ const start = async (): Promise<void> => {
   if (boot.missing.length > 0) {
     setState('denied', { missing: boot.missing });
     bridge.dispose();
-    return;
+    return () => undefined;
   }
 
   void bridge.requestPresentation(PANEL_TITLE, settings.immersive);
@@ -148,7 +153,7 @@ const start = async (): Promise<void> => {
       world.style.transform = camera.transform();
       bridge.saveCamera({ x: camera.state.x, y: camera.state.y });
     }
-    const wallAnimating = wall.render(camera, time);
+    wallAnimating = wall.render(camera, time);
     const snapshot = clock.read(time);
     if (wall.expandedVisible(camera)) controls.update(snapshot);
     if (wall.expandedVisible(camera) && lyricsMountedFor !== null && lyricsView.needsFrames) {
@@ -364,6 +369,16 @@ const start = async (): Promise<void> => {
   const revealInstance = (instance: Instance, durationMs: number): void => {
     if (!lattice) return;
     const rect = lattice.toPixels(instance.rect);
+    if (camera.fisheye) {
+      const screen = projectedCardBounds(rect, camera);
+      if (screen.x < FOCUS_MARGIN_PX || screen.y < FOCUS_MARGIN_PX
+        || screen.x + screen.w > camera.viewport.width - FOCUS_MARGIN_PX
+        || screen.y + screen.h > camera.viewport.height - FOCUS_MARGIN_PX) {
+        camera.flyTo(lattice.centerOf(instance.rect), context.reducedMotion ? 0 : durationMs);
+        requestFrame();
+      }
+      return;
+    }
     const bounds = camera.bounds();
     const margin = FOCUS_MARGIN_PX / camera.state.scale;
     let dx = 0;
@@ -386,6 +401,7 @@ const start = async (): Promise<void> => {
 
   // ---- wall / controls ---------------------------------------------------------------------------
   const wall = createPosterWall(world, {
+    onRenderNeeded: requestFrame,
     onActivate: (instance) => expand(instance),
     onFocusChange: (instance) => { focused = instance; },
     onExpandSettled: () => mountExpandedUi(),
@@ -437,12 +453,14 @@ const start = async (): Promise<void> => {
   controls.setRepeatOne(repeatOne);
 
   const applyVisuals = (): void => {
+    camera.setFisheye(settings.fisheye, !context.reducedMotion);
     applyAppearance(settings);
     wall.setVisualOptions(wallVisualsFromSettings(settings, context.reducedMotion));
     lyricsView.setOptions({ showTranslation: settings.showTranslation, reducedMotion: context.reducedMotion });
     if (context.reducedMotion) lyricsTransition.finish();
     const content = wall.expandedContent();
     if (content) fitLyricsSlot(content);
+    requestFrame();
   };
 
   // ---- lattice lifecycle -------------------------------------------------------------------------
@@ -589,6 +607,8 @@ const start = async (): Promise<void> => {
     commitSettings(previous, patch);
   };
   const browser = createControlPanel(root.querySelector<HTMLElement>('#lattice')!, {
+    speed: echo.speed,
+    desktop: echo.desktop,
     wall: 'library',
     settings,
     lyrics: true,
@@ -610,6 +630,7 @@ const start = async (): Promise<void> => {
   locate.addEventListener('click', onLocate);
 
   const pointer = attachPointerPan(field, {
+    projectPointer: (x, y) => wall.pointerPoint(x, y),
     onPan: (dx, dy) => { camera.panBy(dx, dy); requestFrame(); },
     onFling: (vx, vy) => { camera.fling(vx, vy); requestFrame(); },
     onTap: () => undefined,
@@ -745,6 +766,7 @@ const start = async (): Promise<void> => {
     cancelAnimationFrame(lyricsOpenFrame);
     lyricsOpenFrame = 0;
     window.removeEventListener('pagehide', dispose);
+    signal?.removeEventListener('abort', dispose);
     lyricsRequest = null;
     lyricsCache = null;
     lyricsMountedFor = null;
@@ -765,6 +787,7 @@ const start = async (): Promise<void> => {
     tiles = [];
   };
   window.addEventListener('pagehide', dispose, { once: true });
+  signal?.addEventListener('abort', dispose, { once: true });
+  if (signal?.aborted) dispose();
+  return dispose;
 };
-
-void start();

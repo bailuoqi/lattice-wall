@@ -34,6 +34,16 @@ test('interpolates linearly between samples while playing', () => {
   assert.equal(clock.read(1_500).trackId, 'track-a');
 });
 
+test('uses host playback rate for progress and rebases when the rate changes', () => {
+  const clock = createPlaybackClock();
+  clock.ingest(status({ positionSeconds: 40, playbackRate: 2 }), 0);
+  near(clock.read(500).positionSeconds, 41);
+  clock.ingest(status({ positionSeconds: 41, playbackRate: 0.5 }), 500);
+  near(clock.read(1500).positionSeconds, 41.5);
+  clock.ingest(status({ positionSeconds: 41.5, state: 'paused', playbackRate: 0.5 }), 1500);
+  near(clock.read(2500).positionSeconds, 41.5);
+});
+
 test('freezes the position while paused', () => {
   const clock = createPlaybackClock();
   clock.ingest(status({ state: 'paused', positionSeconds: 12.5 }), 0);

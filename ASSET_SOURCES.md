@@ -19,8 +19,21 @@ adapted from the Lattice Wall component in https://github.com/Moekotori/ECHOStea
 at revision `baf53012d3a04be660775cd4c4acceb7ea5ba490` (AGPL-3.0-only;
 copyright 2026 Moekotori and ECHO contributors). Styles use this plug-in's local
 tokens, and UI actions use its existing public Workshop bridge. ECHOSteam's
-React shell, desktop integration, private host APIs and global shortcut utilities
-are not included. The panel shortcut handler is implemented locally in the sandbox.
+React shell and global shortcut utilities are not included. The panel shortcut
+handler is implemented locally in the sandbox.
+
+## Plug-in desktop integration
+
+The theme entry, shell markup, opaque-frame transport, bounded settings store,
+runtime context and playback speed control are adapted from the supplied
+`lattice-wall-theme-1.0.1.zip` corresponding sources (AGPL-3.0-only;
+copyright 2026 Moekotori, ECHO and Lattice Wall contributors).
+The local version reuses the current wall renderer, adds abortable wall mounts,
+maps the host's playback-rate samples into the display clock, and provides the
+host-managed desktop-wall switch. Desktop window ownership remains in ECHO.
+The single plug-in now uses the standard ECHOSteam SDK for its main and desktop
+entries. No React, Electron, raw preload API, audio engine or native dependency is
+shipped in the plug-in. Desktop ownership and playback authority remain in ECHO.
 
 ## Packaged assets
 

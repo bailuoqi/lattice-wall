@@ -84,7 +84,8 @@ body[data-reduced-motion="true"] .world {
 .field{
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  /* The camera owns movement; focusing controls must never scroll this canvas. */
+  overflow: clip;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -114,6 +115,38 @@ body[data-dragging="true"] .field{
   will-change: transform;
   z-index: 1;
 }
+
+.wall-depth-scene{
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  --depth-x: 0;
+  --depth-y: 0;
+  --depth-amount: 0;
+}
+.wall-depth-scene[data-depth-active="true"]::after{
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: calc(var(--depth-amount) * .34);
+  background: radial-gradient(ellipse 80% 75% at calc(50% + var(--depth-x) * 30%) calc(50% + var(--depth-y) * 30%), rgb(255 255 255 / 18%), transparent 70%);
+  mix-blend-mode: screen;
+}
+/* Project the shared wall plane after flattening its native UI layers. Keeping a 3D context
+   here lets the full-size scene hit plane occlude controls on the tilted-away half. The scene
+   matrix still supplies perspective; foreground depth comes from the per-layer XY parallax. */
+
+.fisheye-surface{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.fisheye-surface[hidden]{ display: none; }
 
 .field__vignette{
   position: absolute;
@@ -146,6 +179,7 @@ html[data-color-scheme="light"] .field__vignette{
   position: absolute;
   left: 0;
   top: 0;
+  transform-origin: 0 0;
   box-sizing: border-box;
   border-radius: 0;
   overflow: hidden;
@@ -156,6 +190,19 @@ html[data-color-scheme="light"] .field__vignette{
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+.world[data-fisheye-surface="true"] .poster{
+  background: transparent;
+  /* UI units follow the curved cover beyond the card's straight four-corner outline. */
+  overflow: visible;
+  contain: layout;
+}
+.world[data-fisheye-surface="true"] .poster__body{ visibility: hidden; }
+
+.poster__meta,
+.poster__lyrics,
+.poster__controls,
+.poster__caption{ transform-origin: 0 0; }
 
 /* Covers stay borderless when focused or expanded. */
 .poster:focus-visible{
@@ -200,6 +247,15 @@ body[data-dragging="true"] .poster .poster__body{
 .poster__fallback{
   position: absolute;
   inset: 0;
+}
+
+.poster__art{
+  position: absolute;
+  inset: 0;
+  transform-origin: center;
+}
+.world[data-depth="true"] .poster__art{
+  transform: translate(calc(var(--depth-x) * var(--depth-amount) * var(--depth-art-shift)), calc(var(--depth-y) * var(--depth-amount) * var(--depth-art-shift))) scale(calc(1 + var(--depth-amount) * var(--depth-art-scale)));
 }
 
 .poster__cover{
@@ -1116,6 +1172,11 @@ body[data-reduced-motion='true'] .state[data-state='booting'] .state__title::bef
 .poster__expanded--album:has(.album-details[data-open="true"])::before{
   opacity: 1;
 }
+.world[data-fisheye-surface="true"] .poster__expanded--album::before{
+  /* The GPU paints this backdrop through the same continuous lens as the cover. Keep the
+     pseudo-element's opacity timeline available to the renderer, including its closing fade. */
+  visibility: hidden;
+}
 .poster__expanded.poster__expanded--album .poster__meta{
   order: 3;
   margin-top: 0;
@@ -1572,4 +1633,14 @@ body[data-reduced-motion="true"] .control-panel *::after { transition: none; ani
 @media (prefers-reduced-motion: reduce) {
   .control-panel *,
   .control-panel *::after { transition: none; animation: none; }
+}
+
+/* 70-theme.css */
+.lattice-wall-host,
+.lattice-wall {
+  height: 100%;
+}
+
+body[data-desktop-wall="true"] .locate {
+  bottom: calc(18px + var(--desktop-wall-bottom-inset, 0px));
 }

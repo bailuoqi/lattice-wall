@@ -1,11 +1,12 @@
 import { formatTime } from '../wall/poster.ts';
 import { TRACK_PAGE_SIZE } from './albumModel.ts';
+import type { WallHostApi } from '../host/api.ts';
 
 const OVERSCAN = 5;
 const MAX_ROWS = 50;
 
 /** A continuous scrollbar backed by at most two visible pages and one pending read. */
-export function createAlbumTrackList(api: EchoWorkshopApi, onPlay: (id: string) => void, onMessage: (text: string) => void) {
+export function createAlbumTrackList(api: Pick<WallHostApi, 'library'>, onPlay: (id: string) => void, onMessage: (text: string) => void) {
   const element = document.createElement('div');
   element.className = 'album-tracks'; element.dataset.scrollable = 'true';
   element.tabIndex = -1;

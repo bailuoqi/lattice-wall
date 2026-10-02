@@ -1,4 +1,5 @@
 import type { Camera, CameraState, PixelRect, Point } from '../types.ts';
+import { fisheyeCardMatrix, fisheyeOffset } from './fisheye.ts';
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 2;
@@ -48,6 +49,9 @@ export function createCamera(initial?: Partial<CameraState>): Camera {
   let scale = clampScale(initial?.scale ?? 1);
   let viewportWidth = 0;
   let viewportHeight = 0;
+  let fisheye = false;
+  let fisheyeAmount = 0;
+  let lensTransition: { from: number; to: number; elapsed: number; last: number | null } | null = null;
 
   let flight: Flight | null = null;
   let coasting = false;
@@ -136,8 +140,18 @@ export function createCamera(initial?: Partial<CameraState>): Camera {
   const camera: Camera = {
     state,
     viewport,
+    get fisheye() { return fisheye || fisheyeAmount > 0; },
+    get fisheyeAmount() { return fisheyeAmount; },
+    setFisheye(enabled, animate = false) {
+      const target = enabled ? 1 : 0;
+      if (enabled === fisheye && (animate || fisheyeAmount === target)) return;
+      dirty = true;
+      fisheye = enabled;
+      if (animate) lensTransition = { from: fisheyeAmount, to: target, elapsed: 0, last: null };
+      else { lensTransition = null; fisheyeAmount = target; }
+    },
     get animating(): boolean {
-      return flight !== null || coasting;
+      return flight !== null || coasting || lensTransition !== null;
     },
     setViewport(width, height) {
       viewportWidth = width;
@@ -193,30 +207,51 @@ export function createCamera(initial?: Partial<CameraState>): Camera {
       inertiaVy = vy;
       inertiaLastMs = null;
     },
-    stop: cancel,
+    stop() { cancel(); lensTransition = null; fisheyeAmount = fisheye ? 1 : 0; },
     tick(nowMs) {
-      const moved = dirty;
+      let moved = dirty;
       dirty = false;
+      if (lensTransition) {
+        const transition = lensTransition;
+        if (transition.last !== null) transition.elapsed += clampFrame(nowMs - transition.last);
+        transition.last = nowMs;
+        const progress = Math.min(1, transition.elapsed / 240);
+        const smooth = progress * progress * (3 - 2 * progress);
+        fisheyeAmount = transition.from + (transition.to - transition.from) * smooth;
+        if (progress === 1) lensTransition = null;
+        moved = true;
+      }
       if (flight !== null) return tickFlight(flight, nowMs) || moved;
       if (coasting) return tickInertia(nowMs) || moved;
       return moved;
     },
     bounds(): PixelRect {
-      const w = viewportWidth / scale;
-      const h = viewportHeight / scale;
+      const lens = fisheyeAmount > 0 ? fisheyeOffset(1, 1, 1, 1, true, fisheyeAmount).x : 1;
+      const w = viewportWidth / scale * lens;
+      const h = viewportHeight / scale * lens;
       return { x: cx - w / 2, y: cy - h / 2, w, h };
     },
     screenToWorld(px, py): Point {
+      const x = px - viewportWidth / 2, y = py - viewportHeight / 2;
+      const offset = fisheyeAmount > 0 ? fisheyeOffset(x, y, viewportWidth / 2, viewportHeight / 2, true, fisheyeAmount) : { x, y };
       return {
-        x: cx + (px - viewportWidth / 2) / scale,
-        y: cy + (py - viewportHeight / 2) / scale,
+        x: cx + offset.x / scale,
+        y: cy + offset.y / scale,
       };
     },
     worldToScreen(x, y): Point {
+      const dx = (x - cx) * scale, dy = (y - cy) * scale;
+      const offset = fisheyeAmount > 0 ? fisheyeOffset(dx, dy, viewportWidth / 2, viewportHeight / 2, false, fisheyeAmount) : { x: dx, y: dy };
       return {
-        x: (x - cx) * scale + viewportWidth / 2,
-        y: (y - cy) * scale + viewportHeight / 2,
+        x: offset.x + viewportWidth / 2,
+        y: offset.y + viewportHeight / 2,
       };
+    },
+    cardTransform(rect) {
+      const translation = `translate(${rect.x}px, ${rect.y}px)`;
+      if (fisheyeAmount === 0) return translation;
+      const matrix = fisheyeCardMatrix(rect, state, viewport, fisheyeAmount);
+      return `${translation} matrix3d(${matrix.map(value => Math.round(value * 1e10) / 1e10).join(',')})`;
     },
     transform() {
       // One displayed scale for both translate and scale(). Rounding them independently

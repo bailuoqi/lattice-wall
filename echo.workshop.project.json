@@ -5,8 +5,8 @@
   "contentDirectory": "content",
   "previewFile": "preview.png",
   "visibility": "public",
-  "description": "Lattice brings library track and album collage walls to ECHO. Browse and search tracks or albums, expand album track lists, play a song or an album, and enjoy synchronized lyrics in immersive panels. Licensed under AGPL-3.0-only. Source: https://github.com/bailuoqi/lattice-wall",
-  "changeNote": "1.2.0: Smoother collage wall rendering and pointer input; improved cover loading and artwork spacing; library pages now contain 200 tracks; album wall layout and lyrics fixes.",
+  "description": "Lattice is a sandboxed ECHO plug-in with track and album collage walls, synchronized lyrics, fisheye, HUD and an adjustable wall tilt angle. Playback speed and desktop wallpaper require an ECHOSteam build with the playback-rate and window:desktop-wall SDK APIs. Licensed under AGPL-3.0-only. Source: https://github.com/bailuoqi/lattice-wall",
+  "changeNote": "1.3.3：使用单个插件包及原有宿主 UI 入口，保留曲库墙、专辑墙、鱼眼和 HUD；修复 HUD 下控件点击，增强悬浮与封面/文字分层视差，新增 0°–10° 墙面倾斜角度选项（默认 5.8°）。变速及桌面墙需要包含 playback-rate 与 window:desktop-wall SDK 接口的 ECHO 构建。",
   "tags": [
     "Sandboxed Plugin"
   ]

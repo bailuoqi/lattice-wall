@@ -24,7 +24,7 @@ try {
 
 await build({
   absWorkingDir: root,
-  entryPoints: { panel: 'source/panel/main.ts', albums: 'source/panel/albums/main.ts' },
+  entryPoints: { panel: 'source/panel/entry.ts', albums: 'source/panel/albums/entry.ts', desktop: 'source/panel/desktopEntry.ts' },
   outdir: 'src',
   bundle: true,
   format: 'iife',
@@ -74,3 +74,5 @@ console.log(`Built lattice-wall sandbox files (${total} bytes total):\n${report.
 if (panelScriptBytes > panelScriptTargetBytes) {
   console.warn(`Warning: panel.js is ${panelScriptBytes} bytes, above the ${panelScriptTargetBytes} byte budget target.`);
 }
+
+

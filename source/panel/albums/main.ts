@@ -1,4 +1,5 @@
 import type { Instance, Lattice, LatticeSettings, Point, Tile } from '../types.ts';
+import type { WallHostApi } from '../host/api.ts';
 import { createHostBridge } from '../host/bridge.ts';
 import { applyContext } from '../host/context.ts';
 import { createPlaybackClock } from '../host/clock.ts';
@@ -17,7 +18,7 @@ import { createAlbumDetails } from './albumDetails.ts';
 
 const TITLE = 'Lattice · 专辑拼贴墙';
 
-async function start(): Promise<void> {
+export async function startLatticeAlbumWall(echo: WallHostApi, signal?: AbortSignal): Promise<() => void> {
   const field = document.getElementById('field')!;
   const world = document.getElementById('world')!;
   const state = document.getElementById('state')!;
@@ -31,18 +32,23 @@ async function start(): Promise<void> {
   };
   document.addEventListener('keydown', earlyExit);
   const boot = await bridge.boot().catch(() => null);
+  if (signal?.aborted) {
+    document.removeEventListener('keydown', earlyExit);
+    bridge.dispose();
+    return () => undefined;
+  }
   if (!boot) {
     document.removeEventListener('keydown', earlyExit);
     overlay.show('denied');
     bridge.dispose();
-    return;
+    return () => undefined;
   }
   applyContext(boot.context);
   if (boot.missing.length) {
     document.removeEventListener('keydown', earlyExit);
     overlay.show('denied', { missing: [...new Set(boot.missing)] });
     bridge.dispose();
-    return;
+    return () => undefined;
   }
   document.removeEventListener('keydown', earlyExit);
   let context = boot.context;
@@ -55,6 +61,7 @@ async function start(): Promise<void> {
   let current: number | null = null;
   let lattice: Lattice | null = null;
   let ready = false, disposed = false;
+  let wallAnimating = false;
   let mounted: string | null = null;
   let shuffleEnabled = boot.status?.shuffleEnabled === true || boot.queue?.shuffleEnabled === true;
   let repeatOne = boot.status?.repeatMode === 'one' || boot.queue?.repeatMode === 'one';
@@ -67,6 +74,7 @@ async function start(): Promise<void> {
     else void bridge.play();
   };
   const details = createAlbumDetails(echo, {
+    onRenderNeeded: () => requestFrame(),
     getLyrics: id => bridge.getLyrics(id),
     readClock: () => clock.read(now()),
     playAlbum: () => undefined,
@@ -95,7 +103,7 @@ async function start(): Promise<void> {
   details.setRepeatOne(repeatOne);
   const loader = createPageLoader(query => echo.library.getAlbums(query), ALBUM_PAGE_SIZE);
   const frameIntervalMs = (): number => document.body.dataset.dragging !== 'true'
-    && !camera.animating ? 33 : INTERACTIVE_FRAME_MS;
+    && !camera.animating && !wallAnimating ? 33 : INTERACTIVE_FRAME_MS;
   const frames = createWallFrameLoop(frame, frameIntervalMs, context.visible);
   const requestFrame = frames.request;
   const updateLocate = () => {
@@ -104,11 +112,11 @@ async function start(): Promise<void> {
   function frame(time: number): boolean {
     if (!ready || disposed) return false;
     if (camera.tick(time)) world.style.transform = camera.transform();
-    const moving = wall.render(camera, time);
+    wallAnimating = wall.render(camera, time);
     mountDetails();
     if (isExpandedCurrent() && wall.expandedVisible(camera)) details.updateClock(clock.read(time));
     updateLocate();
-    return moving || camera.animating || (clock.running && isExpandedCurrent() && details.clockVisible && wall.expandedVisible(camera));
+    return wallAnimating || camera.animating || (clock.running && isExpandedCurrent() && details.clockVisible && wall.expandedVisible(camera));
   }
   function mountDetails() {
     const instance = wall.expanded;
@@ -185,6 +193,7 @@ async function start(): Promise<void> {
     requestFrame();
   }
   const wall = createPosterWall(world, {
+    onRenderNeeded: requestFrame,
     onActivate: expand,
     onFocusChange: () => undefined,
     onExpandSettled: mountDetails,
@@ -192,9 +201,11 @@ async function start(): Promise<void> {
     onHoverCurrent: () => undefined,
   });
   const visuals = () => {
+    camera.setFisheye(settings.fisheye, !context.reducedMotion);
     applyAppearance(settings);
     details.setLyricsOptions({ showTranslation: settings.showTranslation, reducedMotion: context.reducedMotion });
     wall.setVisualOptions(wallVisualsFromSettings(settings, context.reducedMotion));
+    requestFrame();
   };
   const commitSettings = (previous: LatticeSettings, persist: Partial<LatticeSettings> | null): void => {
     visuals();
@@ -265,6 +276,8 @@ async function start(): Promise<void> {
     }
   }
   const browser = createControlPanel(root, {
+    speed: echo.speed,
+    desktop: echo.desktop,
     wall: 'albums',
     settings,
     search: {
@@ -280,6 +293,7 @@ async function start(): Promise<void> {
     onPatchSettings: patchSettings,
   });
   const pointer = attachPointerPan(field, {
+    projectPointer: (x, y) => wall.pointerPoint(x, y),
     onPan: (x, y) => { camera.panBy(x, y); requestFrame(); },
     onFling: (x, y) => { camera.fling(x, y); requestFrame(); },
     onWheel: (x, y) => { camera.panBy(-x, -y); frames.requestInteractive(); },
@@ -388,6 +402,7 @@ async function start(): Promise<void> {
     if (disposed) return;
     disposed = true; frames.dispose(); loader.cancel(); camera.stop();
     window.removeEventListener('pagehide', dispose);
+    signal?.removeEventListener('abort', dispose);
     lattice = null;
     for (const off of stop) off();
     locate.removeEventListener('click', focusCurrent);
@@ -395,6 +410,7 @@ async function start(): Promise<void> {
     details.dispose(); wall.dispose(); bridge.dispose(); albums = []; tiles = [];
   };
   window.addEventListener('pagehide', dispose, { once: true });
+  signal?.addEventListener('abort', dispose, { once: true });
+  if (signal?.aborted) dispose();
+  return dispose;
 }
-
-void start();

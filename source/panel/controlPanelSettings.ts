@@ -1,5 +1,6 @@
 import type { CellSizeId, LatticeSettings, LightingMode, TintGradient } from './types.ts';
 import { controlPanelSettingLocks, sanitizeUiFont } from './host/settings.ts';
+import { createControlPanelHudTilt } from './controlPanelHudTilt.ts';
 
 const FONT_PRESETS: ReadonlyArray<{ value: string; label: string }> = [
   { value: '', label: '系统默认' },
@@ -85,6 +86,15 @@ export function createControlPanelSettings(
   const display = el('section', 'control-panel__section');
   display.append(el('h3', 'control-panel__label', '外观与布局'));
   const showTitles = toggleButton(options.titleLabel);
+  const fisheye = toggleButton('鱼眼模式');
+  const fisheyeHint = el('p', 'control-panel__hint', '四周封面向屏幕内弯曲，营造鱼眼镜头效果。');
+  fisheyeHint.id = 'fisheye-hint';
+  fisheye.setAttribute('aria-describedby', fisheyeHint.id);
+  const pointer3d = toggleButton('HUD');
+  const depthHint = el('p', 'control-panel__hint', '移动指针，让墙面明显悬浮倾斜，封面与文字反向分层移动；可与鱼眼模式叠加。拖动或悬停控件时保持稳定，减少动态效果时暂停视差。');
+  depthHint.id = 'pointer-3d-hint';
+  pointer3d.setAttribute('aria-describedby', depthHint.id);
+  const hudTilt = createControlPanelHudTilt(options);
   const cellSection = el('div', 'control-panel__setting-row');
   cellSection.append(el('span', 'control-panel__field-label', '格子尺寸'));
   const cellRow = el('div', 'control-panel__segments');
@@ -170,7 +180,7 @@ export function createControlPanelSettings(
   customFont.placeholder = '输入字体名，例如 Cascadia Code';
   customFont.setAttribute('aria-label', '自定义字体');
   fontSection.append(font);
-  display.append(showTitles, cellSection, fontSection, customFont, immersive);
+  display.append(showTitles, fisheye, fisheyeHint, pointer3d, depthHint, hudTilt.root, cellSection, fontSection, customFont, immersive);
 
   const lyrics = el('section', 'control-panel__section control-panel__lyrics');
   lyrics.hidden = !options.lyrics;
@@ -194,6 +204,9 @@ export function createControlPanelSettings(
     press(immersive, next.immersive);
     press(autoFocus, next.autoFocus);
     press(showTitles, next.showTitles);
+    press(fisheye, next.fisheye);
+    press(pointer3d, next.pointer3d);
+    hudTilt.sync(next);
     for (const [size, button] of cells) press(button, next.cellSize === size);
     press(spotlight, next.lightingMode === 'spotlight');
     press(daytime, next.lightingMode === 'daytime');
@@ -233,13 +246,15 @@ export function createControlPanelSettings(
   };
 
   const patch = (next: Partial<LatticeSettings>): void => options.onPatchSettings(next);
-  const toggle = (key: 'immersive' | 'autoFocus' | 'vignette' | 'lightsOut' | 'posterTint' | 'posterTintCustom' | 'showTitles' | 'showLyrics' | 'showTranslation'): void => {
+  const toggle = (key: 'immersive' | 'autoFocus' | 'fisheye' | 'pointer3d' | 'vignette' | 'lightsOut' | 'posterTint' | 'posterTintCustom' | 'showTitles' | 'showLyrics' | 'showTranslation'): void => {
     patch({ [key]: !settings[key] });
   };
 
   immersive.addEventListener('click', () => toggle('immersive'), { signal });
   autoFocus.addEventListener('click', () => toggle('autoFocus'), { signal });
   showTitles.addEventListener('click', () => toggle('showTitles'), { signal });
+  fisheye.addEventListener('click', () => toggle('fisheye'), { signal });
+  pointer3d.addEventListener('click', () => toggle('pointer3d'), { signal });
   for (const [size, button] of cells) {
     button.addEventListener('click', () => {
       if (settings.cellSize !== size) patch({ cellSize: size });

@@ -21,8 +21,8 @@ export const ALLOWED_SIZES: ReadonlyArray<readonly [w: number, h: number]> = [
   [3, 4],
   [4, 3],
   [4, 4],
-  [6, 2],
-  [2, 6],
+  [6, 3],
+  [3, 6],
   [6, 4],
   [4, 6],
 ];
@@ -34,26 +34,26 @@ export function isAllowedSize(w: number, h: number): boolean {
   return false;
 }
 
-// Template 0 — hero left (6×4), a 4×4 beside it and a 2×6 pillar on the right edge.
-//   A A A A A A B B B B C C
-//   A A A A A A B B B B C C
-//   A A A A A A B B B B C C
-//   A A A A A A B B B B C C
-//   D D E E E F F F G G C C
-//   D D E E E F F F G G C C
-//   H H H H I I J J K K L L
-//   H H H H I I J J K K L L
+// Template 0 — a 4×4 hero left, two portraits beside it and a wider 3×6 pillar on the right.
+//   A A A A B B B C C D D D
+//   A A A A B B B C C D D D
+//   A A A A B B B C C D D D
+//   A A A A B B B C C D D D
+//   E E E F F F F G G D D D
+//   E E E F F F F G G D D D
+//   H H I I J J J J K K L L
+//   H H I I J J J J K K L L
 const TEMPLATE_HERO_LEFT: readonly TemplateRect[] = [
-  { col: 0, row: 0, w: 6, h: 4 },
-  { col: 6, row: 0, w: 4, h: 4 },
-  { col: 10, row: 0, w: 2, h: 6 },
-  { col: 0, row: 4, w: 2, h: 2 },
-  { col: 2, row: 4, w: 3, h: 2 },
-  { col: 5, row: 4, w: 3, h: 2 },
-  { col: 8, row: 4, w: 2, h: 2 },
-  { col: 0, row: 6, w: 4, h: 2 },
-  { col: 4, row: 6, w: 2, h: 2 },
-  { col: 6, row: 6, w: 2, h: 2 },
+  { col: 0, row: 0, w: 4, h: 4 },
+  { col: 4, row: 0, w: 3, h: 4 },
+  { col: 7, row: 0, w: 2, h: 4 },
+  { col: 9, row: 0, w: 3, h: 6 },
+  { col: 0, row: 4, w: 3, h: 2 },
+  { col: 3, row: 4, w: 4, h: 2 },
+  { col: 7, row: 4, w: 2, h: 2 },
+  { col: 0, row: 6, w: 2, h: 2 },
+  { col: 2, row: 6, w: 2, h: 2 },
+  { col: 4, row: 6, w: 4, h: 2 },
   { col: 8, row: 6, w: 2, h: 2 },
   { col: 10, row: 6, w: 2, h: 2 },
 ];
@@ -82,28 +82,28 @@ const TEMPLATE_HERO_RIGHT: readonly TemplateRect[] = [
   { col: 10, row: 6, w: 2, h: 2 },
 ];
 
-// Template 2 — hero centre (4×4) framed by banners above and below and pillars on the left.
-//   A A A B B B B B B C C C
-//   A A A B B B B B B C C C
-//   D D E E F F F F G G G G
-//   D D E E F F F F G G G G
-//   D D E E F F F F H H I I
-//   D D E E F F F F H H I I
-//   J J J J J J K K K K L L
-//   J J J J J J K K K K L L
+// Template 2 — a thicker 6×3 centre banner flanked by 3×4 portraits and smaller cards.
+//   A A A B B C C C C D D D
+//   A A A B B C C C C D D D
+//   A A A B B C C C C D D D
+//   A A A E E E E E E D D D
+//   F F F E E E E E E G G G
+//   F F F E E E E E E G G G
+//   H H H I I J J K K L L L
+//   H H H I I J J K K L L L
 const TEMPLATE_HERO_CENTRE: readonly TemplateRect[] = [
-  { col: 0, row: 0, w: 3, h: 2 },
-  { col: 3, row: 0, w: 6, h: 2 },
-  { col: 9, row: 0, w: 3, h: 2 },
-  { col: 0, row: 2, w: 2, h: 4 },
-  { col: 2, row: 2, w: 2, h: 4 },
-  { col: 4, row: 2, w: 4, h: 4 },
-  { col: 8, row: 2, w: 4, h: 2 },
-  { col: 8, row: 4, w: 2, h: 2 },
-  { col: 10, row: 4, w: 2, h: 2 },
-  { col: 0, row: 6, w: 6, h: 2 },
-  { col: 6, row: 6, w: 4, h: 2 },
-  { col: 10, row: 6, w: 2, h: 2 },
+  { col: 0, row: 0, w: 3, h: 4 },
+  { col: 3, row: 0, w: 2, h: 3 },
+  { col: 5, row: 0, w: 4, h: 3 },
+  { col: 9, row: 0, w: 3, h: 4 },
+  { col: 3, row: 3, w: 6, h: 3 },
+  { col: 0, row: 4, w: 3, h: 2 },
+  { col: 9, row: 4, w: 3, h: 2 },
+  { col: 0, row: 6, w: 3, h: 2 },
+  { col: 3, row: 6, w: 2, h: 2 },
+  { col: 5, row: 6, w: 2, h: 2 },
+  { col: 7, row: 6, w: 2, h: 2 },
+  { col: 9, row: 6, w: 3, h: 2 },
 ];
 
 // Template 3 — hero top (6×4) flanked by two 3×4 portraits, small cards along the bottom.

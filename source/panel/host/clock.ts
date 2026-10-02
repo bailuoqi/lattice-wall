@@ -1,4 +1,5 @@
 import type { ClockSnapshot, PlaybackClock } from '../types.ts';
+import type { WallPlaybackStatus } from './api.ts';
 
 /** Drift at or above this many seconds snaps to the host value instead of gliding. */
 export const HARD_CORRECTION_SECONDS = 0.35;
@@ -18,6 +19,7 @@ export function createPlaybackClock(): PlaybackClock {
   let sampledAt = 0;
   let duration = 0;
   let state = 'stopped';
+  let playbackRate = 1;
   let trackId: string | null = null;
   let hasSample = false;
   // A pending soft correction: `softDelta` seconds folded in linearly from `softStart`.
@@ -33,7 +35,7 @@ export function createPlaybackClock(): PlaybackClock {
 
   const positionAt = (nowMs: number): number => {
     let position = base;
-    if (state === 'playing') position += Math.max(0, nowMs - sampledAt) / 1000;
+    if (state === 'playing') position += Math.max(0, nowMs - sampledAt) / 1000 * playbackRate;
     if (softDelta !== 0) position += softDelta * clamp01((nowMs - softStart) / SOFT_CORRECTION_MS);
     return clampToDuration(position);
   };
@@ -44,7 +46,7 @@ export function createPlaybackClock(): PlaybackClock {
     softDelta = 0;
   };
 
-  const ingest = (status: EchoWorkshopPlaybackStatus, nowMs: number): void => {
+  const ingest = (status: WallPlaybackStatus, nowMs: number): void => {
     const incomingState = typeof status.state === 'string' ? status.state : 'stopped';
     const incomingTrack = typeof status.currentTrackId === 'string' ? status.currentTrackId : null;
     const incomingPosition = Math.max(0, finiteOr(status.positionSeconds, 0));
@@ -52,9 +54,12 @@ export function createPlaybackClock(): PlaybackClock {
 
     const first = !hasSample;
     const stateChanged = incomingState !== state;
+    const incomingRate = Math.max(0.5, Math.min(2, finiteOr(status.playbackRate, 1)));
+    const rateChanged = incomingRate !== playbackRate;
     const trackChanged = incomingTrack !== trackId;
     duration = Math.max(0, finiteOr(status.durationSeconds, 0));
     state = incomingState;
+    playbackRate = incomingRate;
     trackId = incomingTrack;
     hasSample = true;
 
@@ -62,7 +67,7 @@ export function createPlaybackClock(): PlaybackClock {
     const drift = hostPosition - predicted;
     const agrees = Math.abs(drift) < HARD_CORRECTION_SECONDS;
 
-    if (optimisticHold > 0 && !first && !stateChanged && !trackChanged && !agrees) {
+    if (optimisticHold > 0 && !first && !stateChanged && !rateChanged && !trackChanged && !agrees) {
       // The host has not applied our seek yet (its sample predates it); keep the local position.
       optimisticHold -= 1;
       rebase(clampToDuration(predicted), nowMs);
@@ -70,7 +75,7 @@ export function createPlaybackClock(): PlaybackClock {
     }
     optimisticHold = 0;
 
-    if (first || stateChanged || trackChanged || !agrees) {
+    if (first || stateChanged || rateChanged || trackChanged || !agrees) {
       rebase(clampToDuration(hostPosition), nowMs);
       return;
     }

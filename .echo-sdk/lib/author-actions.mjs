@@ -21,6 +21,7 @@ import {
 import { fullTrustPluginPreset, trustedEntryFileName } from './trusted-plugin.mjs';
 
 export const pluginPermissionWhitelist = [
+  'window:desktop-wall',
   'navigation',
   'playback:read',
   'playback:control',

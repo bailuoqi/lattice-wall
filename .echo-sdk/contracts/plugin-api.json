@@ -13,6 +13,10 @@
       "method": "echo.ui.getContext",
       "permission": null
     },
+    "ui:getParentPage": {
+      "method": "echo.ui.getParentPage",
+      "permission": null
+    },
     "ui:setPanelPresentation": {
       "method": "echo.ui.setPanelPresentation",
       "permission": null
@@ -73,21 +77,9 @@
       "method": "echo.playback.cycleRepeat",
       "permission": "playback:control"
     },
-    "playback:getShareInfo": {
-      "method": "echo.playback.getShareInfo",
-      "permission": "playback:share"
-    },
-    "playback:shareCurrentTrack": {
-      "method": "echo.playback.shareCurrentTrack",
-      "permission": "playback:share"
-    },
-    "playback:getShareTask": {
-      "method": "echo.playback.getShareTask",
-      "permission": "playback:share"
-    },
     "playback:playUrl": {
       "method": "echo.playback.playUrl",
-      "permission": "playback:share"
+      "permission": "sources:direct"
     },
     "audio:getSpectrum": {
       "method": "echo.audio.getSpectrum",
@@ -195,6 +187,14 @@
     },
     "library:addTracksToPlaylist": {
       "method": "echo.library.addTracksToPlaylist",
+      "permission": "library:control"
+    },
+    "library:updatePlaylist": {
+      "method": "echo.library.updatePlaylist",
+      "permission": "library:control"
+    },
+    "library:removePlaylistItems": {
+      "method": "echo.library.removePlaylistItems",
       "permission": "library:control"
     },
     "queue:get": {
@@ -316,6 +316,22 @@
     "ui:notify": {
       "method": "echo.ui.notify",
       "permission": null
+    },
+    "playback:getRate": {
+      "method": "echo.playback.getRate",
+      "permission": "playback:read"
+    },
+    "playback:setRate": {
+      "method": "echo.playback.setRate",
+      "permission": "playback:control"
+    },
+    "window:getDesktopWall": {
+      "method": "echo.window.getDesktopWall",
+      "permission": "window:desktop-wall"
+    },
+    "window:setDesktopWall": {
+      "method": "echo.window.setDesktopWall",
+      "permission": "window:desktop-wall"
     }
   },
   "registrations": {

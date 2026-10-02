@@ -1,0 +1,8 @@
+.lattice-wall-host,
+.lattice-wall {
+  height: 100%;
+}
+
+body[data-desktop-wall="true"] .locate {
+  bottom: calc(18px + var(--desktop-wall-bottom-inset, 0px));
+}

@@ -3,20 +3,20 @@
   "schemaVersion": 1,
   "id": "echo.lattice-wall",
   "title": "Lattice · 音乐拼贴墙",
-  "version": "1.2.0",
+  "version": "1.3.3",
   "content": {
     "kind": "plugin-package",
     "entry": "community.echo"
   },
   "compatibility": {
-    "minEchoVersion": "26.9.5",
+    "minEchoVersion": "26.10.2",
     "pluginApiVersion": 2
   },
   "files": [
     {
       "path": "community.echo",
-      "size": 267036,
-      "sha256": "dbb2e54951d8ce53ab1349bae800f4a69b1852d87fc56152dee19b8fddbb65a9"
+      "size": 492672,
+      "sha256": "4b75f9903834960a6c835d1d2978bf512e2d8945a4306ce68dbd28274673cea7"
     },
     {
       "path": "LICENSE",
@@ -25,8 +25,13 @@
     },
     {
       "path": "NOTICE.md",
-      "size": 1952,
-      "sha256": "ed111195977901fd1b31e761fcee0e1669f9401957cd11e122cd6fda034c0e9b"
+      "size": 2815,
+      "sha256": "fd577fe70f19792a0f878599e8892c2c9b6edb80d634dc46eb25b84eaaef8614"
+    },
+    {
+      "path": "SOURCE.json",
+      "size": 2889579,
+      "sha256": "70d244ed06f8d446c40aca0ba61bd086ee9515ff26f412aa7dd9b6fc1b5d1ca7"
     }
   ],
   "license": {

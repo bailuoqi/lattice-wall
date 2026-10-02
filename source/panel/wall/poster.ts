@@ -4,8 +4,9 @@
  * the pure helpers can be imported from Node tests.
  */
 
-import type { ExpandedContent, GridRect, PixelRect, Tile } from '../types.ts';
+import type { Camera, ExpandedContent, GridRect, PixelRect, Tile } from '../types.ts';
 import { createCoverSwapQueue, createPosterCover, type CoverSwapQueue, type PosterCover } from './posterCover.ts';
+import type { CoverMotion } from './coverMotion.ts';
 
 export const ENTRANCE_STEP_SECONDS = 0.034;
 export const ENTRANCE_MAX_SECONDS = 0.34;
@@ -88,6 +89,7 @@ export type PosterElement = {
   /** Rect last written to the inline style; `applyRect` compares against it to skip redundant writes. */
   readonly rect: PixelRect;
   expanded: ExpandedContent | null;
+  coverMotion: CoverMotion | null;
   /** Primitive snapshot of what the DOM currently shows, so `applyTile` only writes real changes. */
   readonly shown: {
     /** The tile's cover URL (host thumb variant). */
@@ -99,6 +101,8 @@ export type PosterElement = {
     label: string;
     current: boolean;
     hoverGap: number;
+    fisheye: boolean;
+    projectionRevision: number;
   };
 };
 
@@ -156,7 +160,9 @@ export function createPosterElement(coverQueue: CoverSwapQueue = createCoverSwap
   const cover = coverLoader.image;
   const fallback = createDiv('poster__fallback');
   // The fallback precedes the cover so the image paints above the gradient in plain DOM order.
-  body.append(fallback, cover, createDiv('poster__shade'), createDiv('poster__tint'), createDiv('poster__lights'));
+  const art = createDiv('poster__art');
+  art.append(fallback, cover);
+  body.append(art, createDiv('poster__shade'), createDiv('poster__tint'), createDiv('poster__lights'));
   const caption = createDiv('poster__caption');
   const captionTitle = createDiv('poster__caption-title');
   const captionArtist = createDiv('poster__caption-artist');
@@ -177,7 +183,8 @@ export function createPosterElement(coverQueue: CoverSwapQueue = createCoverSwap
     captionArtist,
     rect: { x: NaN, y: NaN, w: NaN, h: NaN },
     expanded: null,
-    shown: { coverUrl: null, box: { w: 0, h: 0 }, scale: 1, trackId: null, label: '', current: false, hoverGap: NaN },
+    coverMotion: null,
+    shown: { coverUrl: null, box: { w: 0, h: 0 }, scale: 1, trackId: null, label: '', current: false, hoverGap: NaN, fisheye: false, projectionRevision: -1 },
   };
   return el;
 }
@@ -246,6 +253,7 @@ export function applyRect(el: PosterElement, rect: PixelRect, gap: number, movin
   const h = moving ? Math.round(rect.h) : round2(rect.h);
 
   if (x !== last.x || y !== last.y) {
+    el.shown.projectionRevision = -1;
     last.x = x;
     last.y = y;
     style.transform = `translate(${x}px, ${y}px)`;
@@ -262,6 +270,7 @@ export function applyRect(el: PosterElement, rect: PixelRect, gap: number, movin
     style.height = `${h}px`;
   }
   if (sizeChanged || gap !== el.shown.hoverGap) {
+    if (sizeChanged) el.shown.projectionRevision = -1;
     // Local thumbnails are square crops; keep the same crop when the full-aspect large image arrives.
     style.setProperty('--cover-side', `${Math.max(w, h)}px`);
     el.shown.hoverGap = gap;
@@ -269,6 +278,19 @@ export function applyRect(el: PosterElement, rect: PixelRect, gap: number, movin
     style.setProperty('--hx', scale.x.toFixed(4));
     style.setProperty('--hy', scale.y.toFixed(4));
   }
+}
+
+/** Cache lens work while only the playback clock changes. */
+export function syncPosterProjection(el: PosterElement, camera: Camera, revision: number): void {
+  if (!camera.fisheye) {
+    if (el.shown.fisheye) el.root.style.transform = camera.cardTransform(el.rect);
+    el.shown.fisheye = false;
+    return;
+  }
+  if (el.shown.fisheye && el.shown.projectionRevision === revision) return;
+  el.shown.fisheye = true;
+  el.shown.projectionRevision = revision;
+  el.root.style.transform = camera.cardTransform(el.rect);
 }
 
 function fillMeta(content: ExpandedContent, tile: Tile | undefined): void {
@@ -322,6 +344,7 @@ export function removeExpandedContent(el: PosterElement): void {
  * and `applyRect` only write what actually differs for the next instance.
  */
 export function clearPosterInstance(el: PosterElement): void {
+  el.coverMotion = null;
   removeExpandedContent(el);
   const root = el.root;
   root.className = 'poster';
@@ -331,6 +354,7 @@ export function clearPosterInstance(el: PosterElement): void {
   delete root.dataset.settled;
   delete root.dataset.focused;
   delete root.dataset.lyrics;
+  delete root.dataset.lensHover;
   root.style.removeProperty('--enter-delay');
 }
 

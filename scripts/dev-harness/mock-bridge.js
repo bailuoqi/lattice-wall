@@ -202,6 +202,9 @@
   };
 
   const SETTING_DEFAULTS = {
+    fisheye: params.get('fisheye') === '1',
+    'pointer-3d': params.get('depth3d') === '1',
+    'hud-tilt-angle': 5.8,
     immersive: true, 'auto-focus': true, 'lighting-mode': 'spotlight', vignette: true, 'lights-out': false, 'poster-tint': true, 'poster-tint-custom': false,
     'poster-tint-color': '#000000', 'poster-tint-intensity': 0.5, 'cell-size': 'M', 'show-lyrics': true, 'show-translation': true, 'ui-font': '',
   };
@@ -214,6 +217,7 @@
   const state = {
     index: fixture.current,
     playback: fixture.playback,
+    playbackRate: 1,
     anchorPosition: fixture.position,
     anchorAt: performance.now(),
     colorScheme: params.get('scheme') === 'light' ? 'light' : 'dark',
@@ -234,7 +238,7 @@
   const duration = () => (currentItem() ? currentItem().track.durationSeconds : 0);
   const position = () => {
     if (state.playback !== 'playing') return state.anchorPosition;
-    return Math.min(duration(), state.anchorPosition + (performance.now() - state.anchorAt) / 1000);
+    return Math.min(duration(), state.anchorPosition + (performance.now() - state.anchorAt) / 1000 * state.playbackRate);
   };
   const setPosition = (seconds) => {
     state.anchorPosition = Math.max(0, Math.min(duration(), seconds));
@@ -268,6 +272,7 @@
     positionSeconds: position(),
     durationSeconds: duration(),
     volume: 0.8,
+    playbackRate: state.playbackRate,
     shuffleEnabled: state.shuffle,
     repeatMode: state.repeat,
   });
@@ -381,6 +386,8 @@
 
   const ACTION_PERMISSIONS = {
     'host:getCapabilities': null, 'host:getFeatureAvailability': null, 'ui:getContext': null, 'ui:setPanelPresentation': null, 'ui:openPanel': null, 'ui:closePanel': null, 'ui:notify': null,
+    'playback:getRate': 'playback:read', 'playback:setRate': 'playback:control',
+    'window:getDesktopWall': 'window:desktop-wall', 'window:setDesktopWall': 'window:desktop-wall',
     'playback:getStatus': 'playback:read', 'playback:play': 'playback:control', 'playback:pause': 'playback:control', 'playback:seek': 'playback:control',
     'playback:previous': 'playback:control', 'playback:next': 'playback:control',
     'playback:toggleShuffle': 'playback:control', 'playback:setShuffle': 'playback:control',
@@ -402,6 +409,7 @@
   // ---------------------------------------------------------------------------------------------
 
   const echo = Object.freeze({
+    window: Object.freeze({ getDesktopWall: async () => ({ supported: false, enabled: false }), setDesktopWall: async () => { throw new Error('command-unavailable'); } }),
     host: Object.freeze({
       getCapabilities: () => request('host:getCapabilities', () => ({
         apiVersion: 2,
@@ -517,6 +525,11 @@
     }),
     playback: Object.freeze({
       getStatus: () => request('playback:getStatus', guarded('playback:read', snapshotStatus)),
+      getRate: () => request('playback:getRate', guarded('playback:read', () => state.playbackRate)),
+      setRate: rate => request('playback:setRate', guarded('playback:control', () => {
+        if (typeof rate !== 'number' || !Number.isFinite(rate) || rate < 0.5 || rate > 2) throw new Error('invalid-payload');
+        const current = position(); state.playbackRate = rate; setPosition(current); emitStatus(); return rate;
+      })),
       play: () => request('playback:play', guarded('playback:control', () => (play(), null))),
       pause: () => request('playback:pause', guarded('playback:control', () => (pause(), null))),
       seek: (positionSeconds) => request('playback:seek', guarded('playback:control', () => (seek(positionSeconds), null))),
@@ -578,6 +591,10 @@
   window.__latticeMock = Object.freeze({
     fixture: fixtureName,
     fixtures: Object.keys(FIXTURES),
+    setPlaybackRate: (rate) => {
+      if (!Number.isFinite(rate) || rate < 0.5 || rate > 2) throw new Error('invalid-payload');
+      setPosition(position()); state.playbackRate = rate; emitStatus(); return rate;
+    },
     next: () => safely(() => goTo(state.index + 1)),
     previous: () => safely(() => goTo(state.index - 1)),
     play: () => safely(play),
@@ -597,6 +614,7 @@
     snapshot: () => ({
       fixture: fixtureName,
       state: state.playback,
+      playbackRate: state.playbackRate,
       positionSeconds: position(),
       durationSeconds: duration(),
       index: state.index,

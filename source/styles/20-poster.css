@@ -6,6 +6,7 @@
   position: absolute;
   left: 0;
   top: 0;
+  transform-origin: 0 0;
   box-sizing: border-box;
   border-radius: 0;
   overflow: hidden;
@@ -16,6 +17,19 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+.world[data-fisheye-surface="true"] .poster{
+  background: transparent;
+  /* UI units follow the curved cover beyond the card's straight four-corner outline. */
+  overflow: visible;
+  contain: layout;
+}
+.world[data-fisheye-surface="true"] .poster__body{ visibility: hidden; }
+
+.poster__meta,
+.poster__lyrics,
+.poster__controls,
+.poster__caption{ transform-origin: 0 0; }
 
 /* Covers stay borderless when focused or expanded. */
 .poster:focus-visible{
@@ -60,6 +74,15 @@ body[data-dragging="true"] .poster .poster__body{
 .poster__fallback{
   position: absolute;
   inset: 0;
+}
+
+.poster__art{
+  position: absolute;
+  inset: 0;
+  transform-origin: center;
+}
+.world[data-depth="true"] .poster__art{
+  transform: translate(calc(var(--depth-x) * var(--depth-amount) * var(--depth-art-shift)), calc(var(--depth-y) * var(--depth-amount) * var(--depth-art-shift))) scale(calc(1 + var(--depth-amount) * var(--depth-art-scale)));
 }
 
 .poster__cover{

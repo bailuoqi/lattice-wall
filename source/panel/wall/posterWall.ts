@@ -7,6 +7,7 @@
 import {
   BLOCK_COLS,
   BLOCK_ROWS,
+  type Camera,
   type ExpandedContent,
   type GridRect,
   type Instance,
@@ -15,6 +16,7 @@ import {
   type PosterWall,
   type PosterWallHandlers,
   type Tile,
+  type WallVisualOptions,
 } from '../types.ts';
 import { createRectSpring, type RectSpring } from './spring.ts';
 import {
@@ -28,9 +30,15 @@ import {
   removeExpandedContent,
   resetPosterElement,
   syncPosterCover,
+  syncPosterProjection,
   type PosterElement,
 } from './poster.ts';
 import { createCoverSwapQueue } from './posterCover.ts';
+import { FISHEYE_BOUNDS_SCALE, projectedCardBounds } from './fisheye.ts';
+import { createFisheyeSurface } from './fisheyeSurface.ts';
+import { createFisheyeUiProjection } from './fisheyeUi.ts';
+import { createDepthScene } from './depthScene.ts';
+import { HUD_DEFAULT_TILT_ANGLE } from '../hudSettings.ts';
 
 const OVERSCAN_PX = 500;
 const RECULL_MARGIN_PX = 180;
@@ -84,6 +92,15 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   let focusPending = false;
   let reducedMotion = false;
   let coverScale = 1;
+  let cullLimit = CULL_LIMIT;
+  const field = world.parentElement!;
+  const depth = createDepthScene(field, world, () => handlers.onRenderNeeded?.());
+  let surface: ReturnType<typeof createFisheyeSurface> = null;
+  let surfaceFailed = false;
+  let surfaceDirty = true;
+  let interactionCamera: Camera | null = null;
+  let visualOptions: WallVisualOptions = { pointer3d: false, hudTiltAngle: HUD_DEFAULT_TILT_ANGLE, lightsOut: false, vignette: true, tint: true,
+    tintGradient: 'none', tintColor: '#000000', tintIntensity: .5, reducedMotion: false };
 
   const pool = new Map<string, Entry>();
   const free: PosterElement[] = [];
@@ -97,7 +114,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   let layoutDirty = true;
   let culledOnce = false;
   const cullBounds: PixelRect = { x: 0, y: 0, w: 0, h: 0 };
-  const lastView = { x: NaN, y: NaN, scale: NaN };
+  const lastView = { x: NaN, y: NaN, scale: NaN, width: NaN, height: NaN, fisheye: false, amount: NaN };
+  let projectionRevision = 0;
   let lastNow: number | null = null;
   let entrance: 'idle' | 'pending' | 'played' = 'idle';
   /** `onExpandSettled` still owed for the current expansion. */
@@ -108,7 +126,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   let disposed = false;
   const abort = new AbortController();
   const signal = abort.signal;
-  const coverQueue = createCoverSwapQueue();
+  const coverQueue = createCoverSwapQueue(() => { surfaceDirty = true; handlers.onRenderNeeded?.(); });
+  const uiProjection = createFisheyeUiProjection(() => handlers.onRenderNeeded?.());
 
   const gap = (): number => (lattice ? lattice.metrics.gap : 0);
 
@@ -117,6 +136,18 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     if (!card) return null;
     const id = card.dataset.instance;
     return id === undefined ? null : (pool.get(id) ?? null);
+  }
+
+  function entryAtPoint(clientX: number, clientY: number): Entry | null {
+    if (!interactionCamera?.fisheye || world.dataset.fisheyeSurface !== 'true') return null;
+    const screen = depth.pointerPoint(clientX, clientY);
+    const point = interactionCamera.screenToWorld(screen.x, screen.y);
+    const contains = (entry: Entry) => point.x >= entry.el.rect.x && point.y >= entry.el.rect.y
+      && point.x < entry.el.rect.x + entry.el.rect.w && point.y < entry.el.rect.y + entry.el.rect.h;
+    const open = expanded ? pool.get(expanded.id) : null;
+    if (open && contains(open)) return open;
+    for (const entry of [...pool.values()].reverse()) if (contains(entry)) return entry;
+    return null;
   }
 
   function sameQueueId(previousTiles: Tile[], previousIndex: number, nextIndex: number): boolean {
@@ -199,6 +230,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
 
   /** Points a card element (fresh, pooled or just unbound) at `instance` and registers it in the pool. */
   function bindEntry(lat: Lattice, el: PosterElement, instance: Instance, visible: PixelRect): Entry {
+    surfaceDirty = true;
     const target = lat.toPixels(instance.rect);
     const entry: Entry = { el, instance, spring: null, tileIndex: instance.tileIndex, target, stamp };
     const tile = tiles[instance.tileIndex];
@@ -211,6 +243,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     // Only a card that appears inside the viewport needs the fade; overscan mounts are never seen
     // popping in, and skipping the animation there avoids a class + animationend cycle per card.
     if (culledOnce && entrance !== 'pending' && !reducedMotion && intersects(target, visible)) {
+      el.coverMotion = { kind: 'fade', startedAt: performance.now(), delayMs: 0 };
       el.root.classList.add('poster--fade');
     }
     if (expanded && expanded.id === instance.id) {
@@ -239,6 +272,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
 
   /** Forget the instance a card shows; `park` also drops its cover because it is going to the free list. */
   function unbindEntry(entry: Entry, park: boolean): void {
+    surfaceDirty = true;
     pool.delete(entry.instance.id);
     if (collapsing === entry) collapsing = null;
     if (hoverId === entry.instance.id) hoverId = null;
@@ -301,7 +335,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       w: Math.max(1, maxX - minX),
       h: Math.max(1, maxY - minY),
     };
-    const available = lat.cull(bounds, OVERSCAN_PX, null, CULL_LIMIT);
+    const available = lat.cull(bounds, OVERSCAN_PX, null, cullLimit);
     const taken = new Uint8Array(available.length);
     pool.clear();
     const leftover: Entry[] = [];
@@ -372,7 +406,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
 
   function recull(lat: Lattice, bounds: PixelRect): void {
     // Reserve one slot for the expanded card, which remains mounted even far outside the viewport.
-    const culled = lat.cull(bounds, OVERSCAN_PX, expanded, expanded ? CULL_LIMIT - 1 : CULL_LIMIT);
+    const culled = lat.cull(bounds, OVERSCAN_PX, expanded, expanded ? cullLimit - 1 : cullLimit);
     stamp += 1;
     const snapAll = layoutDirty;
     layoutDirty = false;
@@ -460,13 +494,16 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     if (reducedMotion) return;
     const leftCol = Math.floor(bounds.x / lat.unit);
     const topRow = Math.floor(bounds.y / lat.unit);
+    const startedAt = performance.now();
     for (const entry of pool.values()) {
       // The already-expanded card is on screen at ready; only the other tiles ride the wave
       // (SPEC §2.1). Putting `poster--enter` on it would replay overlay fade-in when the class
       // is removed and make the chrome vanish for a frame.
       if (expanded && entry.instance.id === expanded.id) continue;
       const root = entry.el.root;
-      root.style.setProperty('--enter-delay', `${entranceDelaySeconds(entry.instance.rect, leftCol, topRow)}s`);
+      const delay = entranceDelaySeconds(entry.instance.rect, leftCol, topRow);
+      entry.el.coverMotion = { kind: 'enter', startedAt, delayMs: delay * 1000 };
+      root.style.setProperty('--enter-delay', `${delay}s`);
       root.classList.remove('poster--fade');
       root.classList.add('poster--enter');
     }
@@ -475,6 +512,10 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   function snapAll(): void {
     const g = gap();
     for (const entry of pool.values()) {
+      if (reducedMotion) {
+        entry.el.coverMotion = null;
+        entry.el.root.classList.remove('poster--enter', 'poster--fade');
+      }
       if (!entry.spring) continue;
       entry.spring = null;
       applyRect(entry.el, entry.target, g);
@@ -489,6 +530,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       if (previous) clearFocusAttrs(previous.el);
     }
     const changed = focused?.id !== instance?.id;
+    if (changed) { surfaceDirty = true; handlers.onRenderNeeded?.(); }
     focused = instance;
     focusPending = false;
     if (!instance) {
@@ -510,10 +552,13 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     if (moveDomFocus && !(active && entry.el.root.contains(active))) entry.el.root.focus({ preventScroll: true });
   }
 
-  world.addEventListener(
+  field.addEventListener(
     'click',
     (event) => {
-      const entry = entryFromTarget(event.target);
+      const element = elementFromTarget(event.target);
+      const nativeControl = element?.closest('button, input, select, textarea, a[href], .poster__controls, .poster__expanded, .poster__caption');
+      const entry = nativeControl || event.detail === 0 ? entryFromTarget(event.target)
+        : entryAtPoint(event.clientX, event.clientY) ?? entryFromTarget(event.target);
       if (!entry) return;
       if (expanded && entry.instance.id === expanded.id) {
         // The second click of a double-click must not immediately hide the controls just shown.
@@ -527,6 +572,23 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     },
     { signal },
   );
+
+  field.addEventListener('pointermove', event => {
+    if (!interactionCamera?.fisheye || world.dataset.fisheyeSurface !== 'true') return;
+    const entry = field.ownerDocument.body.dataset.dragging === 'true' ? null : entryAtPoint(event.clientX, event.clientY);
+    if (hoverId === (entry?.instance.id ?? null)) return;
+    if (hoverId) pool.get(hoverId)?.el.root.removeAttribute('data-lens-hover');
+    hoverId = entry?.instance.id ?? null;
+    if (entry) {
+      entry.el.root.dataset.lensHover = 'true';
+      if (entry.tileIndex === currentTile) handlers.onHoverCurrent(entry.instance);
+    }
+    surfaceDirty = true; handlers.onRenderNeeded?.();
+  }, { signal, passive: true });
+  field.addEventListener('pointerleave', () => {
+    if (hoverId) pool.get(hoverId)?.el.root.removeAttribute('data-lens-hover');
+    hoverId = null; surfaceDirty = true; handlers.onRenderNeeded?.();
+  }, { signal, passive: true });
 
   world.addEventListener(
     'mousedown',
@@ -542,6 +604,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   world.addEventListener(
     'pointerover',
     (event) => {
+      if (world.dataset.fisheyeSurface === 'true') return;
       const entry = entryFromTarget(event.target);
       if (!entry || hoverId === entry.instance.id) return;
       hoverId = entry.instance.id;
@@ -553,6 +616,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   world.addEventListener(
     'pointerout',
     (event) => {
+      if (world.dataset.fisheyeSurface === 'true') return;
       const card = elementFromTarget(event.target)?.closest<HTMLElement>('.poster');
       if (!card) return;
       const to = event.relatedTarget;
@@ -577,6 +641,9 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     'animationend',
     (event) => {
       if (event.animationName !== 'poster-enter' && event.animationName !== 'poster-fade') return;
+      const entry = entryFromTarget(event.target);
+      if (entry) entry.el.coverMotion = null;
+      surfaceDirty = true; handlers.onRenderNeeded?.();
       elementFromTarget(event.target)?.closest('.poster')?.classList.remove('poster--enter', 'poster--fade');
     },
     { signal },
@@ -584,6 +651,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
 
   return {
     setLattice(nextLattice, nextTiles, options) {
+      surfaceDirty = true;
       const previousTiles = tiles;
       const previousExpanded = expanded;
       const previousFocused = focused;
@@ -652,6 +720,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     },
 
     setCurrent(tileIndex) {
+      surfaceDirty = true;
       if (tileIndex === currentTile) return;
       const previous = currentTile;
       currentTile = tileIndex;
@@ -663,6 +732,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     },
 
     setExpanded(instance) {
+      surfaceDirty = true;
       if (instance && expanded && instance.id === expanded.id) return;
       if (!instance && !expanded) return;
       const previous = expanded;
@@ -719,6 +789,9 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     },
 
     setVisualOptions(options) {
+      visualOptions = options;
+      depth.setOptions(options.pointer3d, options.reducedMotion, options.hudTiltAngle);
+      surfaceDirty = true;
       world.dataset.lightsOut = String(options.lightsOut);
       world.dataset.tint = String(options.tint);
       world.dataset.tintGradient = options.tintGradient;
@@ -732,6 +805,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
 
     render(camera, nowMs) {
       if (disposed || !lattice) return false;
+      interactionCamera = camera;
+      const depthFrame = depth.tick(nowMs, camera.viewport);
       let dt = 1 / 60;
       if (lastNow !== null) {
         const elapsed = (nowMs - lastNow) / 1000;
@@ -740,17 +815,27 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       lastNow = nowMs;
 
       coverScale = camera.state.scale;
+      // The lens pulls a larger source area into view; retain its corners on large displays.
+      cullLimit = camera.fisheye ? Math.ceil(CULL_LIMIT * FISHEYE_BOUNDS_SCALE ** 2) : CULL_LIMIT;
       // panBy() is an immediate move, not camera.animating. Track the displayed view so
       // pointer/wheel input and inertia share the same foreground-work budget.
-      const viewChanged = Number.isFinite(lastView.x) && (
-        lastView.x !== camera.state.x || lastView.y !== camera.state.y || lastView.scale !== coverScale
-      );
+      const projectionChanged = lastView.x !== camera.state.x || lastView.y !== camera.state.y
+        || lastView.scale !== coverScale || lastView.width !== camera.viewport.width
+        || lastView.height !== camera.viewport.height || lastView.fisheye !== camera.fisheye
+        || lastView.amount !== camera.fisheyeAmount;
+      const viewChanged = Number.isFinite(lastView.x) && projectionChanged;
+      if (projectionChanged) projectionRevision++;
+      if (lastView.fisheye !== camera.fisheye) needsCull = true;
       const cameraMoving = viewChanged || camera.animating
         || world.closest<HTMLElement>('.lattice-wall')?.dataset.dragging === 'true';
       coverQueue.setPaused(cameraMoving);
       lastView.x = camera.state.x;
       lastView.y = camera.state.y;
       lastView.scale = coverScale;
+      lastView.width = camera.viewport.width;
+      lastView.height = camera.viewport.height;
+      lastView.fisheye = camera.fisheye;
+      lastView.amount = camera.fisheyeAmount;
       const bounds = camera.bounds();
       if (needsCull || leavesCulledArea(bounds)) recull(lattice, bounds);
       const mounting = (pendingMounts.length > 0 || staleEntries.length > 0)
@@ -761,18 +846,40 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       const g = lattice.metrics.gap;
       for (const entry of pool.values()) {
         const spring = entry.spring;
-        if (!spring) continue;
-        if (spring.step(dt)) {
-          applyRect(entry.el, spring.current, g, true);
-          moving = true;
-        } else {
-          entry.spring = null;
-          applyRect(entry.el, entry.target, g);
+        if (spring) {
+          surfaceDirty = true;
+          if (spring.step(dt)) {
+            applyRect(entry.el, spring.current, g, true);
+            moving = true;
+          } else {
+            entry.spring = null;
+            applyRect(entry.el, entry.target, g);
+          }
         }
+        syncPosterProjection(entry.el, camera, projectionRevision);
       }
 
       if (collapsing && !collapsing.spring) finishCollapse();
       checkSettled();
+      if (camera.fisheye) {
+        if (surface?.needsReplacement) { surface.dispose(); surface = null; }
+        if (!surface && !surfaceFailed) {
+          surface = createFisheyeSurface(depth.root, () => handlers.onRenderNeeded?.());
+          surfaceFailed = surface === null;
+        }
+        const painted = surface?.render(camera, [...pool.values()].map(entry => ({ el: entry.el,
+          tile: tiles[entry.tileIndex], current: entry.tileIndex === currentTile })), visualOptions, dt,
+          surfaceDirty || projectionChanged || moving || depthFrame.changed, nowMs, depth.pose);
+        world.dataset.fisheyeSurface = String(painted?.ready === true);
+        if (painted?.moving) moving = true;
+        surfaceDirty = false;
+      } else {
+        if (surface && !surface.canvas.hidden) surface.hide();
+        delete world.dataset.fisheyeSurface;
+        surfaceFailed = false;
+      }
+      const uiAnimating = uiProjection.sync([...pool.values()].map(entry => entry.el), camera,
+        projectionRevision, world.dataset.fisheyeSurface === 'true', depth.pose);
       // Retain the existing image during motion. Settle size/zoom first, then change at most
       // four sources per frame; the shared queue bounds temporary decoded replacements.
       if (!moving && !cameraMoving) {
@@ -785,7 +892,7 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
         }
       }
       // One settling frame flushes deferred cover sizes after the final immediate move.
-      return moving || viewChanged;
+      return moving || viewChanged || uiAnimating || depthFrame.moving;
     },
 
     playEntrance() {
@@ -796,7 +903,10 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       if (!expanded) return false;
       const entry = pool.get(expanded.id);
       if (!entry) return false;
-      return intersects(entry.spring ? entry.spring.current : entry.target, camera.bounds());
+      const rect = entry.spring ? entry.spring.current : entry.target;
+      if (!camera.fisheye && !depth.active) return intersects(rect, camera.bounds());
+      const projection = { worldToScreen: (x: number, y: number) => depth.screenPoint(camera.worldToScreen(x, y)) };
+      return intersects(projectedCardBounds(rect, projection), { x: 0, y: 0, w: camera.viewport.width, h: camera.viewport.height });
     },
 
     expandedContent(): ExpandedContent | null {
@@ -808,7 +918,13 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       return entryFromTarget(target)?.instance ?? null;
     },
 
+    pointerPoint(clientX, clientY) { return depth.pointerPoint(clientX, clientY); },
+
     clear() {
+      uiProjection.clear();
+      surface?.hide();
+      surfaceDirty = true;
+      delete world.dataset.fisheyeSurface;
       if (document.activeElement && world.contains(document.activeElement)) world.parentElement?.focus({ preventScroll: true });
       coverQueue.clear();
       for (const entry of pool.values()) { resetPosterElement(entry.el); entry.el.root.remove(); }
@@ -816,13 +932,16 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       lattice = null; tiles = []; expanded = null; focused = null; currentTile = null;
       collapsing = null; hoverId = null; focusPending = false; settlePending = false;
       needsCull = true; layoutDirty = true; culledOnce = false; lastNow = null; entrance = 'idle';
-      lastView.x = lastView.y = lastView.scale = NaN;
+      lastView.x = lastView.y = lastView.scale = lastView.width = lastView.height = lastView.amount = NaN;
     },
 
     dispose() {
       if (disposed) return;
       disposed = true;
       abort.abort();
+      uiProjection.dispose();
+      surface?.dispose(); surface = null;
+      depth.dispose();
       coverQueue.dispose();
       for (const entry of pool.values()) { resetPosterElement(entry.el); entry.el.root.remove(); }
       pool.clear();

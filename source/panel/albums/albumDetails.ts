@@ -1,13 +1,14 @@
 import type { ClockSnapshot, ExpandedContent, LyricsViewOptions } from '../types.ts';
+import type { WallHostApi } from '../host/api.ts';
 import { createAlbumActions, type AlbumActionHandlers } from './albumActions.ts';
 import { createAlbumTrackList } from './albumTrackList.ts';
 import { createAlbumLyrics, type AlbumLyricsHost } from './albumLyrics.ts';
 import { createAlbumLayout, type AlbumContentMode } from './albumLayout.ts';
 
-export type AlbumDetailsHost = AlbumActionHandlers & AlbumLyricsHost;
+export type AlbumDetailsHost = AlbumActionHandlers & AlbumLyricsHost & { onRenderNeeded?(): void };
 
 /** One expanded album owns a bounded scrolling list and a single set of playback controls. */
-export function createAlbumDetails(api: EchoWorkshopApi, host: AlbumDetailsHost) {
+export function createAlbumDetails(api: WallHostApi, host: AlbumDetailsHost) {
   const element = document.createElement('div');
   element.className = 'album-details';
   element.dataset.scrollable = 'true';
@@ -93,6 +94,8 @@ export function createAlbumDetails(api: EchoWorkshopApi, host: AlbumDetailsHost)
     }
     lyrics.setActive(mode === 'lyrics' && album !== null && thisAlbum);
     layout.setMode(mode);
+    // Wake the projected backdrop even when playback is paused and reduced motion skips the fade.
+    if (contentSlot) host.onRenderNeeded?.();
   };
   setContentMode(contentMode);
 

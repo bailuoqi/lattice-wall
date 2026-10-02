@@ -1,4 +1,5 @@
 import type { BootData, HostBridge, Point, RequiredCapability, SettingValues } from '../types.ts';
+import type { WallHostApi } from './api.ts';
 
 export type HostBridgeOptions = {
   now?: () => number;
@@ -92,7 +93,7 @@ export function deriveMissingCapabilities(capabilities: unknown, probes = CAPABI
   return missing;
 }
 
-export function createHostBridge(api: EchoWorkshopApi, options?: HostBridgeOptions): HostBridge {
+export function createHostBridge(api: WallHostApi, options?: HostBridgeOptions): HostBridge {
   const now = options?.now ?? (() => performance.now());
   const schedule = options?.setTimeout ?? setTimeout;
   const cancel = options?.clearTimeout ?? clearTimeout;

@@ -37,6 +37,8 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
   let dragging = false;
   let rawAttached = false;
   let rawSeen = false;
+  const point = (event: PointerEvent) => handlers.projectPointer?.(event.clientX, event.clientY)
+    ?? { x: event.clientX, y: event.clientY };
 
   const sampleTimes = new Float64Array(SAMPLE_CAPACITY);
   const sampleXs = new Float64Array(SAMPLE_CAPACITY);
@@ -113,12 +115,14 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
     if (target instanceof Element && target.closest(INTERACTIVE_SELECTOR) !== null) return;
     activePointerId = event.pointerId;
     downTarget = target;
-    startX = lastX = event.clientX;
-    startY = lastY = event.clientY;
+    startX = event.clientX;
+    startY = event.clientY;
+    const projected = point(event);
+    lastX = projected.x; lastY = projected.y;
     dragging = false;
     sampleHead = 0;
     sampleCount = 0;
-    pushSample(event.timeStamp, event.clientX, event.clientY);
+    pushSample(event.timeStamp, projected.x, projected.y);
     // Only subscribe during a gesture; raw input updates the target while the wall's
     // existing rAF owner still coalesces all DOM work into one frame.
     if (field.ownerDocument.defaultView && 'onpointerrawupdate' in field.ownerDocument.defaultView) {
@@ -141,11 +145,10 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
 
   function movePointer(event: PointerEvent): void {
     if (event.pointerId !== activePointerId) return;
-    const x = event.clientX;
-    const y = event.clientY;
+    const { x, y } = point(event);
     pushSample(event.timeStamp, x, y);
     if (!dragging) {
-      if (Math.hypot(x - startX, y - startY) < DRAG_THRESHOLD_PX) return;
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) < DRAG_THRESHOLD_PX) return;
       // The wall follows from the crossing point, so the drag starts without a 7 px jump.
       dragging = true;
       lastX = x;
@@ -167,7 +170,8 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
 
   function onPointerUp(event: PointerEvent): void {
     if (event.pointerId !== activePointerId) return;
-    pushSample(event.timeStamp, event.clientX, event.clientY);
+    const projected = point(event);
+    pushSample(event.timeStamp, projected.x, projected.y);
     const target = downTarget;
     const wasDragging = dragging;
     endGesture();
@@ -215,6 +219,11 @@ export function attachPointerPan(field: HTMLElement, handlers: PointerPanHandler
     if (event.shiftKey && dx === 0) {
       dx = dy;
       dy = 0;
+    }
+    if (handlers.projectPointer) {
+      const from = handlers.projectPointer(event.clientX, event.clientY);
+      const to = handlers.projectPointer(event.clientX + dx, event.clientY + dy);
+      dx = to.x - from.x; dy = to.y - from.y;
     }
     if (dx !== 0 || dy !== 0) handlers.onWheel(dx, dy);
   }

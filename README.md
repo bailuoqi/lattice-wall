@@ -2,9 +2,11 @@
 
 English · [简体中文](./README.zh-CN.md)
 
-One plug-in, two player launchers: **Lattice · 曲库拼贴墙** and
-**Lattice · 专辑拼贴墙**. The id stays `echo.lattice-wall`, so existing
-installations retain their settings when updated to 1.2.0.
+Version **1.3.3** is a single sandboxed plug-in package, content id `echo.lattice-wall`.
+It keeps the original host UI entry and immersive track/album walls. Playback speed and
+desktop wallpaper use the new ECHOSteam plug-in SDK APIs; fisheye and HUD are preserved.
+This requires an ECHOSteam build that includes those APIs.
+Enable the item in ECHO Workshop, or import `content/`, and approve the declared desktop-wall capability.
 
 The library wall loads up to 200 tracks from the ECHO library
 (`echo.library.getTracks`) and tiles them into an endless, draggable wall of
@@ -53,6 +55,7 @@ only (`AGPL-3.0-only`)**. See [LICENSE](./LICENSE) for the full terms and
 The Workshop package includes both files; its license metadata links to the
 [source repository](https://github.com/bailuoqi/lattice-wall). Source and build
 instructions for a distributed package must match that package's version.
+The Workshop item also includes `SOURCE.json`, a complete source snapshot for its released version.
 
 The album wall of [folia-major](https://github.com/chthollyphile/folia-major)
 (AGPL-3.0) is an acknowledged reference. The previous clean-room and no-copying
@@ -70,9 +73,17 @@ The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
 - 12×8 blocks built from five templates with hashed mirroring so
   adjacent blocks never repeat; a pre-solved reflow table moves the other eleven
   cards aside when one expands to 6×6.
+  Long portrait cards use 3×6 cells; wide banners use 6×3 cells.
 - Expanded card: title, artist, library badge, previous / play-pause / next;
   a play button for non-current tracks. The seek slider and time readout appear
   only on the playing track's card.
+- Optional fisheye mode in Appearance curves the wall inward at the screen edges, with titles, lyrics and controls following the lens.
+  It defaults to off and is shared by both walls.
+- Optional HUD in Appearance adds a stronger floating tilt, with artwork and text moving in opposite
+  directions at separate parallax depths. It works alongside fisheye mode, stays steady while dragging
+  or hovering over controls, and is disabled by reduced-motion preferences. The Wall tilt angle slider
+  sets its maximum angle from 0° to 10° (default 5.8°); 0° keeps floating parallax without the tilt.
+  The slider is enabled while HUD is on, saves when released, and is shared by both walls.
 - Current track: no cover border, optional automatic follow when the track
   changes, current-and-next lyrics with per-word highlight.
 - Bottom-right locate button (same as the `C` key) that fades in whenever the
@@ -92,14 +103,16 @@ The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
   both while keeping playback controls available. The canvas stays black in both
   host themes, with 4 px gaps between cards.
 
-These UI refinements were adapted from ECHOSteam's Lattice Wall component using
-this plug-in's existing Workshop APIs. Desktop integration and host-only playback
-speed controls are not included.
+These UI refinements were adapted from ECHOSteam and the supplied theme sources.
+`npm run check` builds and validates the single plug-in package in `content/`.
+The function panel provides a 0.5×–2× speed slider and a host-owned desktop-wall switch.
+Use `npm run package:source` followed by `npm run sync` to refresh the corresponding source inventory.
+The main panel and desktop entry both use the standard opaque plug-in SDK bridge.
 
 ## Privacy and host boundaries
 
 Permissions: `playback:read`, `playback:control`, `queue:read`,
-`queue:control`, `lyrics:read`, `library:read`, `fs:plugin`. No network hosts, no
+`queue:control`, `lyrics:read`, `library:read`, `fs:plugin`, `window:desktop-wall`. No network hosts, no
 `system:full`, no trusted entry, no file export. Every playback fact comes from
 the host at 1 Hz and is interpolated locally; the plug-in never receives audio,
 file paths. Library data is limited to sanitized, bounded pages. `echo.storage` only holds

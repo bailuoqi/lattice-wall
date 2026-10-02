@@ -3,6 +3,9 @@ import { createControlPanelSettings } from './controlPanelSettings.ts';
 import { createControlPanelTabs } from './controlPanelTabs.ts';
 import { createControlPanelShortcut } from './controlPanelShortcut.ts';
 import { matchesPanelShortcut, panelShortcutAria } from './host/controlPanelShortcut.ts';
+import { createControlPanelSpeed } from './controlPanelSpeed.ts';
+import { createControlPanelDesktop } from './controlPanelDesktop.ts';
+import type { SpeedControl, DesktopControl } from './host/api.ts';
 
 export type ControlPanelWall = 'library' | 'albums';
 
@@ -48,6 +51,8 @@ export function createControlPanel(
     settings: LatticeSettings;
     search: ControlPanelSearchCopy;
     lyrics?: boolean;
+    speed?: SpeedControl;
+    desktop?: DesktopControl;
     onLoad: (page: number, search: string) => void;
     onSwitchWall: (target: ControlPanelWall) => void;
     onPatchSettings: (patch: Partial<LatticeSettings>) => void;
@@ -118,15 +123,21 @@ export function createControlPanel(
     signal,
   });
 
+  const speed = options.speed ? createControlPanelSpeed(options.speed) : null;
+  const desktop = options.desktop ? createControlPanelDesktop(options.desktop, signal) : null;
+
   const body = el('div', 'control-panel__body');
   const { sections } = appearance;
   const tabs = createControlPanelTabs([
     { id: 'browse', label: '浏览', sections: [wallSection, shortcutSetting.root] },
-    { id: 'playback', label: '播放', sections: [sections.behavior, sections.lyrics] },
-    { id: 'appearance', label: '外观', sections: [sections.display] },
+    { id: 'playback', label: '播放', sections: [...(speed ? [speed.root] : []), sections.behavior, sections.lyrics] },
+    { id: 'appearance', label: '外观', sections: [sections.display, ...(desktop ? [desktop.root] : [])] },
     { id: 'lighting', label: '光影', sections: [sections.lighting] },
   ], signal, category => {
     if (category !== 'browse') shortcutSetting.cancel();
+    if (dialog.open && category === 'playback') speed?.open();
+    else speed?.close();
+    if (dialog.open && category === 'appearance') desktop?.open();
   });
   body.append(tabs.navigation, tabs.pages);
   const footer = el('div', 'control-panel__footer');
@@ -144,6 +155,7 @@ export function createControlPanel(
 
   const close = (): void => {
     shortcutSetting.cancel();
+    speed?.close();
     dialog.close();
     const target = returnFocus?.isConnected ? returnFocus : document.getElementById('field');
     target?.focus({ preventScroll: true });
@@ -283,7 +295,7 @@ export function createControlPanel(
     },
     syncSettings,
     dispose() {
-
+      speed?.dispose();
       clearTimeout(timer);
       abort.abort();
       dialog.close();

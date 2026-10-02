@@ -26,6 +26,11 @@
 .poster__expanded--album:has(.album-details[data-open="true"])::before{
   opacity: 1;
 }
+.world[data-fisheye-surface="true"] .poster__expanded--album::before{
+  /* The GPU paints this backdrop through the same continuous lens as the cover. Keep the
+     pseudo-element's opacity timeline available to the renderer, including its closing fade. */
+  visibility: hidden;
+}
 .poster__expanded.poster__expanded--album .poster__meta{
   order: 3;
   margin-top: 0;

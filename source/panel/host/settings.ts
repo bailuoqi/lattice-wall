@@ -1,3 +1,4 @@
+import { HUD_DEFAULT_TILT_ANGLE, normalizeHudTiltAngle } from '../hudSettings.ts';
 import { DEFAULT_PANEL_SHORTCUT, normalizePanelShortcut } from './controlPanelShortcut.ts';
 import type { CellSizeId, LatticeSettings, LightingMode, Metrics, SettingValues, WallVisualOptions } from '../types.ts';
 
@@ -6,6 +7,9 @@ export const SETTING_IDS: Record<keyof LatticeSettings, string> = {
   controlPanelShortcut: 'control-panel-shortcut',
   immersive: 'immersive',
   autoFocus: 'auto-focus',
+  fisheye: 'fisheye',
+  pointer3d: 'pointer-3d',
+  hudTiltAngle: 'hud-tilt-angle',
   lightingMode: 'lighting-mode',
   vignette: 'vignette',
   lightsOut: 'lights-out',
@@ -25,6 +29,9 @@ export const DEFAULT_SETTINGS: LatticeSettings = {
   controlPanelShortcut: DEFAULT_PANEL_SHORTCUT,
   immersive: true,
   autoFocus: true,
+  fisheye: false,
+  pointer3d: false,
+  hudTiltAngle: HUD_DEFAULT_TILT_ANGLE,
   lightingMode: 'spotlight',
   vignette: true,
   lightsOut: false,
@@ -79,6 +86,9 @@ export function resolveSettings(values: SettingValues): LatticeSettings {
     controlPanelShortcut: normalizePanelShortcut(read('controlPanelShortcut')) ?? DEFAULT_PANEL_SHORTCUT,
     immersive: bool(read('immersive'), DEFAULT_SETTINGS.immersive),
     autoFocus: bool(read('autoFocus'), DEFAULT_SETTINGS.autoFocus),
+    fisheye: bool(read('fisheye'), DEFAULT_SETTINGS.fisheye),
+    pointer3d: bool(read('pointer3d'), DEFAULT_SETTINGS.pointer3d),
+    hudTiltAngle: normalizeHudTiltAngle(read('hudTiltAngle')),
     lightingMode: isLightingMode(lighting) ? lighting : DEFAULT_SETTINGS.lightingMode,
     vignette: bool(read('vignette'), DEFAULT_SETTINGS.vignette),
     lightsOut: bool(read('lightsOut'), DEFAULT_SETTINGS.lightsOut),
@@ -136,6 +146,8 @@ export function controlPanelSettingLocks(settings: LatticeSettings): {
 export function wallVisualsFromSettings(settings: LatticeSettings, reducedMotion: boolean): WallVisualOptions {
   const daytime = settings.lightingMode === 'daytime';
   return {
+    pointer3d: settings.pointer3d,
+    hudTiltAngle: settings.hudTiltAngle,
     lightsOut: daytime ? false : settings.lightsOut,
     vignette: daytime ? false : settings.vignette,
     tint: daytime ? false : settings.posterTint,
@@ -155,6 +167,7 @@ export function applyUiFont(font: string): void {
 
 /** Lighting dataset, shade colour token, and UI font. Call before `wall.setVisualOptions`. */
 export function applyAppearance(settings: LatticeSettings): void {
+  document.body.dataset.fisheye = String(settings.fisheye);
   document.body.dataset.showTitles = String(settings.showTitles);
   document.body.dataset.lighting = settings.lightingMode;
   document.body.dataset.vignette = String(settings.lightingMode !== 'daytime' && settings.vignette);

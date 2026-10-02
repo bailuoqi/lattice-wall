@@ -151,6 +151,9 @@ export type CameraState = { x: number; y: number; scale: number };
 /** Implemented in `wall/camera.ts` (`createCamera`). Owns pan/fling/fly animation; no DOM. */
 export type Camera = {
   readonly state: Readonly<CameraState>;
+  readonly fisheye: boolean;
+  readonly fisheyeAmount: number;
+  setFisheye(enabled: boolean, animate?: boolean): void;
   /** Viewport size in CSS px; main updates it on resize. */
   setViewport(width: number, height: number): void;
   readonly viewport: Readonly<{ width: number; height: number }>;
@@ -171,6 +174,8 @@ export type Camera = {
   bounds(): PixelRect;
   screenToWorld(px: number, py: number): Point;
   worldToScreen(x: number, y: number): Point;
+  /** Local card transform; includes the optional screen-centred lens projection. */
+  cardTransform(rect: PixelRect): string;
   /** CSS transform for `.world` with `transform-origin: 0 0`. */
   transform(): string;
 };
@@ -180,6 +185,8 @@ export type Camera = {
 // ---------------------------------------------------------------------------------------------------
 
 export type PointerPanHandlers = {
+  /** Map displayed input onto the wall's plane when the optional perspective scene is active. */
+  projectPointer?(clientX: number, clientY: number): Point;
   /** Drag movement in screen px since last event (only after the 7 px threshold). */
   onPan(dx: number, dy: number): void;
   /** Pointer released after a drag with a screen-space velocity in px/s (already smoothed). */
@@ -296,6 +303,10 @@ export type LatticeSettings = {
   controlPanelShortcut: string;
   immersive: boolean;
   autoFocus: boolean;
+  fisheye: boolean;
+  pointer3d: boolean;
+  /** HUD maximum horizontal tilt in degrees, 0..10. */
+  hudTiltAngle: number;
   lightingMode: LightingMode;
   vignette: boolean;
   lightsOut: boolean;
@@ -356,6 +367,8 @@ export type LyricsView = {
 // ---------------------------------------------------------------------------------------------------
 
 export type WallVisualOptions = {
+  pointer3d: boolean;
+  hudTiltAngle: number;
   lightsOut: boolean;
   vignette: boolean;
   tint: boolean;
@@ -367,6 +380,7 @@ export type WallVisualOptions = {
 };
 
 export type PosterWallHandlers = {
+  onRenderNeeded?(): void;
   /** Card activated by click / Enter / Space. */
   onActivate(instance: Instance): void;
   /** Focus moved (keyboard or programmatic). */
@@ -417,6 +431,7 @@ export type PosterWall = {
   expandedContent(): ExpandedContent | null;
   /** Instance for a DOM node inside `.world`, or null. */
   instanceFromTarget(target: EventTarget | null): Instance | null;
+  pointerPoint(clientX: number, clientY: number): Point;
   /** Release all cards and page data while retaining delegated event handlers. */
   clear(): void;
   dispose(): void;
