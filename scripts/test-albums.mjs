@@ -31,7 +31,7 @@ test('a delayed page never replaces a newer search; cancel also discards in-flig
   const loader = createPageLoader(query => new Promise((resolve, reject) => requests.push({ query, resolve, reject })), ALBUM_PAGE_SIZE);
   const old = loader.load(1, 'old');
   const fresh = loader.load(2, 'new');
-  assert.deepEqual(requests[1].query, { page: 2, pageSize: 60, search: 'new' });
+  assert.deepEqual(requests[1].query, { page: 2, pageSize: 60, search: 'new', sourceProvider: 'local' });
   requests[1].resolve({ page: 2, pageSize: 60, total: 90, hasMore: false, items: [album()] });
   assert.equal((await fresh).page, 2);
   requests[0].reject(new Error('late failure'));

@@ -1,3 +1,4 @@
+import type { LibrarySource } from '../host/librarySource.ts';
 import type { ClockSnapshot, ExpandedContent, LyricsViewOptions } from '../types.ts';
 import type { WallHostApi } from '../host/api.ts';
 import { createAlbumActions, type AlbumActionHandlers } from './albumActions.ts';
@@ -140,7 +141,7 @@ export function createAlbumDetails(api: WallHostApi, host: AlbumDetailsHost) {
   };
 
   return {
-    mount(content: ExpandedContent, nextAlbum: EchoWorkshopAlbum, currentAlbum: boolean) {
+    mount(content: ExpandedContent, nextAlbum: EchoWorkshopAlbum, currentAlbum: boolean, source: LibrarySource = 'local') {
       clear();
       album = nextAlbum;
       thisAlbum = currentAlbum;
@@ -149,7 +150,7 @@ export function createAlbumDetails(api: WallHostApi, host: AlbumDetailsHost) {
       content.lyrics.replaceChildren(element, lyrics.element);
       content.controls.replaceChildren(cluster.element);
       layout.mount(content);
-      tracks.mount(nextAlbum);
+      tracks.mount(nextAlbum, source);
       applyMode();
     },
     updateCurrent(id: string | null, currentAlbum: boolean) {

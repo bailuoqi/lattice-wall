@@ -1,3 +1,4 @@
+import type { LibrarySource, LibraryPageQuery } from '../host/librarySource.ts';
 import { formatTime } from '../wall/poster.ts';
 import { TRACK_PAGE_SIZE } from './albumModel.ts';
 import type { WallHostApi } from '../host/api.ts';
@@ -21,6 +22,7 @@ export function createAlbumTrackList(api: Pick<WallHostApi, 'library'>, onPlay: 
   const failures = new Set<number>();
   const mounted = new Map<number, HTMLElement>();
   let albumId: string | null = null, currentId: string | null = null;
+  let sourceProvider: LibrarySource = 'local';
   let total = 0, generation = 0, frame = 0, pending: Promise<void> | null = null;
   let firstPage = 1, lastPage = 1, previousRange = '', revision = 0;
   let initial = true;
@@ -53,7 +55,8 @@ export function createAlbumTrackList(api: Pick<WallHostApi, 'library'>, onPlay: 
     element.setAttribute('aria-busy', 'true');
     const task = (async () => {
       try {
-        const result = await api.library.getAlbumTracks(id, { page, pageSize: TRACK_PAGE_SIZE });
+        const query: LibraryPageQuery = { page, pageSize: TRACK_PAGE_SIZE, sourceProvider };
+        const result = await api.library.getAlbumTracks(id, query);
         if (request !== generation) return;
         total = Math.max(0, result.total);
         // A fast scroll may move past this request before it completes; do not retain it.
@@ -203,8 +206,9 @@ export function createAlbumTrackList(api: Pick<WallHostApi, 'library'>, onPlay: 
   }
   return {
     element,
-    mount(album: EchoWorkshopAlbum) {
+    mount(album: EchoWorkshopAlbum, source: LibrarySource = 'local') {
       clear(); albumId = album.id; total = album.trackCount;
+      sourceProvider = source;
       onMessage('正在加载曲目…'); schedule();
     },
     setCurrent(id: string | null) { if (id !== currentId) { currentId = id; markCurrent(); } },

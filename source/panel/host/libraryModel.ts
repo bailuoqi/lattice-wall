@@ -1,3 +1,4 @@
+import type { LibrarySource, LibraryPageQuery } from './librarySource.ts';
 import type { RequiredCapability, Tile } from '../types.ts';
 import { FALLBACK_ARTIST, FALLBACK_TITLE } from './queueModel.ts';
 
@@ -71,11 +72,11 @@ export function playContextIds(tiles: readonly Tile[], centerIndex: number, limi
  * has fewer than 200 remaining tracks. Only the current wall page is retained.
  */
 export function createLibraryTrackLoader(
-  read: (query: EchoWorkshopPageQuery) => Promise<EchoWorkshopPage<EchoWorkshopTrack>>,
+  read: (query: LibraryPageQuery) => Promise<EchoWorkshopPage<EchoWorkshopTrack>>,
 ) {
   let generation = 0;
   return {
-    async load(wallPage: number, search = ''): Promise<EchoWorkshopPage<EchoWorkshopTrack> | null> {
+    async load(wallPage: number, search = '', sourceProvider: LibrarySource = 'local'): Promise<EchoWorkshopPage<EchoWorkshopTrack> | null> {
       const request = ++generation;
       const page = Number.isInteger(wallPage) && wallPage > 0 ? wallPage : 1;
       const hostStart = (page - 1) * HOST_PAGES_PER_WALL + 1;
@@ -89,6 +90,7 @@ export function createLibraryTrackLoader(
             page: hostStart + step,
             pageSize: LIBRARY_HOST_PAGE_SIZE,
             search,
+            sourceProvider,
           });
         } catch (error) {
           if (request !== generation) return null;

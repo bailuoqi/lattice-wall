@@ -1,3 +1,4 @@
+import type { LibrarySource, LibraryPageQuery } from '../host/librarySource.ts';
 import type { RequiredCapability, Tile } from '../types.ts';
 
 export const ALBUM_PAGE_SIZE = 60;
@@ -40,13 +41,13 @@ export function currentAlbumIndex(albums: EchoWorkshopAlbum[], track: EchoWorksh
 }
 
 /** Ignore stale responses without accumulating a cache of old album/track pages. */
-export function createPageLoader<T>(read: (query: EchoWorkshopPageQuery) => Promise<EchoWorkshopPage<T>>, pageSize: number) {
+export function createPageLoader<T>(read: (query: LibraryPageQuery) => Promise<EchoWorkshopPage<T>>, pageSize: number) {
   let generation = 0;
   return {
-    async load(page: number, search = ''): Promise<EchoWorkshopPage<T> | null> {
+    async load(page: number, search = '', sourceProvider: LibrarySource = 'local'): Promise<EchoWorkshopPage<T> | null> {
       const request = ++generation;
       try {
-        const result = await read({ page, pageSize, search });
+        const result = await read({ page, pageSize, search, sourceProvider });
         if (request !== generation) return null;
         return { ...result, items: result.items.slice(0, pageSize) };
       } catch (error) {
