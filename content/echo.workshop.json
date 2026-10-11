@@ -15,8 +15,8 @@
   "files": [
     {
       "path": "community.echo",
-      "size": 492672,
-      "sha256": "4b75f9903834960a6c835d1d2978bf512e2d8945a4306ce68dbd28274673cea7"
+      "size": 494315,
+      "sha256": "25cfaa1479623c980af375127b4226de3759bfca1f0aa5f0c24f50587c25b928"
     },
     {
       "path": "LICENSE",
@@ -27,11 +27,6 @@
       "path": "NOTICE.md",
       "size": 2815,
       "sha256": "fd577fe70f19792a0f878599e8892c2c9b6edb80d634dc46eb25b84eaaef8614"
-    },
-    {
-      "path": "SOURCE.json",
-      "size": 2889579,
-      "sha256": "70d244ed06f8d446c40aca0ba61bd086ee9515ff26f412aa7dd9b6fc1b5d1ca7"
     }
   ],
   "license": {
