@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   ENTRANCE_MAX_SECONDS,
+  ENTRANCE_STEP_SECONDS,
   coverVariantFor,
   coverVariantUrl,
-  entranceDelaySeconds,
+  entranceDelaysSeconds,
   fallbackGradient,
   formatTime,
   hoverScale,
@@ -92,15 +93,33 @@ test('formatTime renders m:ss, h:mm:ss and guards bad input', () => {
   assert.equal(formatTime(Number.POSITIVE_INFINITY), '0:00');
 });
 
-test('entranceDelaySeconds grows along the diagonal and is capped', () => {
-  assert.equal(entranceDelaySeconds({ col: 0, row: 0, w: 2, h: 2 }, 0, 0), 0);
-  assert.equal(entranceDelaySeconds({ col: 3, row: 2, w: 2, h: 2 }, 0, 0), 0.17);
-  assert.equal(entranceDelaySeconds({ col: 13, row: 12, w: 2, h: 2 }, 10, 10), 0.17);
-  assert.equal(entranceDelaySeconds({ col: -4, row: -3, w: 2, h: 2 }, -4, -3), 0);
-  assert.equal(entranceDelaySeconds({ col: -6, row: 0, w: 2, h: 2 }, 0, 0), 0);
-  assert.equal(entranceDelaySeconds({ col: 40, row: 40, w: 2, h: 2 }, 0, 0), ENTRANCE_MAX_SECONDS);
-  assert.equal(entranceDelaySeconds({ col: 10, row: 0, w: 2, h: 2 }, 0, 0), ENTRANCE_MAX_SECONDS);
-  assert.equal(entranceDelaySeconds({ col: 9, row: 0, w: 2, h: 2 }, 0, 0), 0.306);
+test('entrance shuffles tile order without mutating the mount list', () => {
+  const ids = ['0:0:0', '0:0:1', '0:0:2', '-1:0:0'];
+  const delays = entranceDelaysSeconds(ids, () => 0);
+  assert.deepEqual(ids, ['0:0:0', '0:0:1', '0:0:2', '-1:0:0']);
+  assert.deepEqual([...delays.keys()], ['0:0:1', '0:0:2', '-1:0:0', '0:0:0']);
+  assert.deepEqual([...delays.values()], [0, 0.055, 0.11, 0.165]);
+  assert.notDeepEqual([...entranceDelaysSeconds(ids, () => .999).keys()], [...delays.keys()]);
+});
+
+test('entrance delays cover deferred mounts, stay distinct, and cap total reveal time', () => {
+  for (const count of [2, 10, 60, 250, 563]) {
+    const ids = Array.from({ length: count }, (_, index) => `tile-${index}`);
+    const schedule = entranceDelaysSeconds(ids, () => .5);
+    const delays = [...schedule.values()];
+    assert.equal(schedule.size, count);
+    assert.equal(new Set(delays).size, count);
+    assert.equal(delays[0], 0);
+    assert.ok(delays.at(-1) <= ENTRANCE_MAX_SECONDS);
+    assert.ok(Math.abs(delays.at(-1) - Math.min(ENTRANCE_MAX_SECONDS, (count - 1) * ENTRANCE_STEP_SECONDS)) < .001);
+    assert.ok(ids.every(id => schedule.has(id)));
+  }
+});
+
+test('entrance handles empty, single and repeated instances', () => {
+  assert.equal(entranceDelaysSeconds([]).size, 0);
+  assert.deepEqual([...entranceDelaysSeconds(['expanded'])], [['expanded', 0]]);
+  assert.deepEqual([...entranceDelaysSeconds(['expanded', 'expanded'])], [['expanded', 0]]);
 });
 
 test('hoverScale grows a card by one gap on each axis independently', () => {

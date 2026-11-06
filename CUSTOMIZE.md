@@ -43,10 +43,13 @@
 
 ## 改代码
 
-1. 模板：`source/panel/geometry/blockTemplates.ts`。改完必须运行 `npm run reflows`
-   重新求解让位表，然后 `npm test`（几何测试会验证 240 张表全部精确覆盖）。
+1. 模板与让位表：由 `scripts/generate-reflows.mjs` 求解，写入 `source/panel/geometry/blockLayouts.json`。
+   调整 block 尺寸、尺寸配比或评分权重后运行 `npm run reflows`，再运行 `npm test`
+   （几何测试会验证全部模板与让位表精确覆盖、无过长直缝、展开卡原地放大）。
 2. 动效参数：`source/panel/wall/spring.ts`（弹簧刚度）、`camera.ts`（飞行时长、
-   惯性衰减）、`posterWall.ts`（入场波浪延迟）。
+   惯性衰减）、`poster.ts`（进入墙面时的随机拼贴间隔；翻页、搜索、刷新与桌面墙不播放）、`coverMotion.ts`（黑块停留 40 ms、快速褪黑 160 ms，
+   与 `source/styles/20-poster.css` 同步）。`wallOpening.ts` 在初次组装完成前保持文档透明；
+   ECHO 本体的面板壳和 iframe 也必须透明，才能让拼贴直接叠在原页面上，而不是在不透明窗口内播放。
 3. 样式：`source/styles/NN-*.css`，按编号顺序拼接；主题 token 用 `--host-*` 变量。
 4. 文案：`source/panel/stateOverlay.ts`（空态 / 权限态）、`wall/controls.ts`
    （按钮 aria-label）。

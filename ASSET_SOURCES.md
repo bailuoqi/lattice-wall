@@ -9,8 +9,9 @@ Lattice Wall is licensed under AGPL-3.0-only. See `LICENSE` and `NOTICE.md`.
 - Relationship: reference for the album-wall design. The previous claims of
   inspiration only, clean-room implementation, original template designs and
   no copying of code, data or stylesheet values have been withdrawn.
-- Local build inputs: `source/panel/geometry/blockTemplates.ts` contains the
-  five templates; `scripts/generate-reflows.mjs` generates `blockReflows.json`.
+- Local build inputs: `scripts/generate-reflows.mjs` searches the five 20×12 block
+  templates and the expansion reflows and writes `source/panel/geometry/blockLayouts.json`,
+  which `blockTemplates.ts` loads. Earlier releases used five hand-drawn 12×8 templates.
 
 ## UI refinements
 

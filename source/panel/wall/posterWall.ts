@@ -26,7 +26,8 @@ import {
   buildExpandedContent,
   clearPosterInstance,
   createPosterElement,
-  entranceDelaySeconds,
+  ENTRANCE_MAX_SECONDS,
+  entranceDelaysSeconds,
   removeExpandedContent,
   resetPosterElement,
   syncPosterCover,
@@ -34,6 +35,7 @@ import {
   type PosterElement,
 } from './poster.ts';
 import { createCoverSwapQueue } from './posterCover.ts';
+import { ENTRANCE_DURATION_MS, sampleCoverMotion } from './coverMotion.ts';
 import { FISHEYE_BOUNDS_SCALE, projectedCardBounds } from './fisheye.ts';
 import { createFisheyeSurface } from './fisheyeSurface.ts';
 import { createFisheyeUiProjection } from './fisheyeUi.ts';
@@ -118,6 +120,9 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
   let projectionRevision = 0;
   let lastNow: number | null = null;
   let entrance: 'idle' | 'pending' | 'played' = 'idle';
+  let entranceStartedAt: number | null = null;
+  let entranceDelays = new Map<string, number>();
+  let entranceCompletionPending = false;
   /** `onExpandSettled` still owed for the current expansion. */
   let settlePending = false;
   /** Previously expanded card that keeps its content until its spring settles. */
@@ -242,7 +247,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     el.root.dataset.instance = instance.id;
     // Only a card that appears inside the viewport needs the fade; overscan mounts are never seen
     // popping in, and skipping the animation there avoids a class + animationend cycle per card.
-    if (culledOnce && entrance !== 'pending' && !reducedMotion && intersects(target, visible)) {
+    if (entrance !== 'pending' && !reducedMotion && !enterCard(entry, performance.now())
+      && culledOnce && intersects(target, visible)) {
       el.coverMotion = { kind: 'fade', startedAt: performance.now(), delayMs: 0 };
       el.root.classList.add('poster--fade');
     }
@@ -489,24 +495,37 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       : pendingMounts.length > 0 || staleEntries.length > 0;
   }
 
-  function applyEntrance(lat: Lattice, bounds: PixelRect): void {
+  function enterCard(entry: Entry, nowMs: number): boolean {
+    const delay = entranceDelays.get(entry.instance.id);
+    if (entranceStartedAt === null || delay === undefined) return false;
+    const delayMs = delay * 1000;
+    if (nowMs >= entranceStartedAt + delayMs + ENTRANCE_DURATION_MS) return false;
+    entry.el.coverMotion = { kind: 'enter', startedAt: entranceStartedAt, delayMs };
+    // Late mounts join the same timeline instead of flashing in or replaying a full delay.
+    entry.el.root.style.setProperty('--enter-delay', `${(entranceStartedAt + delayMs - nowMs) / 1000}s`);
+    entry.el.root.classList.remove('poster--fade');
+    entry.el.root.classList.add('poster--enter');
+    surfaceDirty = true;
+    return true;
+  }
+
+  function finishEntrance(): void {
+    entranceDelays.clear();
+    entranceStartedAt = null;
+    delete field.dataset.entering;
+    surfaceDirty = true;
+    entranceCompletionPending = true;
+  }
+
+  function applyEntrance(lat: Lattice, bounds: PixelRect, nowMs: number): void {
     entrance = 'played';
-    if (reducedMotion) return;
-    const leftCol = Math.floor(bounds.x / lat.unit);
-    const topRow = Math.floor(bounds.y / lat.unit);
-    const startedAt = performance.now();
-    for (const entry of pool.values()) {
-      // The already-expanded card is on screen at ready; only the other tiles ride the wave
-      // (SPEC §2.1). Putting `poster--enter` on it would replay overlay fade-in when the class
-      // is removed and make the chrome vanish for a frame.
-      if (expanded && entry.instance.id === expanded.id) continue;
-      const root = entry.el.root;
-      const delay = entranceDelaySeconds(entry.instance.rect, leftCol, topRow);
-      entry.el.coverMotion = { kind: 'enter', startedAt, delayMs: delay * 1000 };
-      root.style.setProperty('--enter-delay', `${delay}s`);
-      root.classList.remove('poster--fade');
-      root.classList.add('poster--enter');
-    }
+    if (reducedMotion) { finishEntrance(); return; }
+    const instances = [...pool.values()].map(entry => entry.instance).concat(pendingMounts);
+    entranceDelays = entranceDelaysSeconds(instances
+      .filter(instance => intersects(lat.toPixels(instance.rect), bounds)).map(instance => instance.id));
+    entranceStartedAt = nowMs;
+    field.dataset.entering = 'true';
+    for (const entry of pool.values()) enterCard(entry, nowMs);
   }
 
   function snapAll(): void {
@@ -800,7 +819,11 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       world.style.setProperty('--tint-alpha', String(Math.min(0.85, Math.max(0, options.tintIntensity))));
       const wasReduced = reducedMotion;
       reducedMotion = options.reducedMotion;
-      if (reducedMotion && !wasReduced) snapAll();
+      if (reducedMotion && !wasReduced) {
+        if (entranceStartedAt !== null || entrance === 'pending') finishEntrance();
+        if (entrance === 'pending') entrance = 'played';
+        snapAll();
+      }
     },
 
     render(camera, nowMs) {
@@ -840,11 +863,20 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       if (needsCull || leavesCulledArea(bounds)) recull(lattice, bounds);
       const mounting = (pendingMounts.length > 0 || staleEntries.length > 0)
         && flushMounts(lattice, bounds, cameraMoving);
-      if (entrance === 'pending') applyEntrance(lattice, bounds);
+      if (entrance === 'pending') applyEntrance(lattice, bounds, nowMs);
+      if (entranceStartedAt !== null && nowMs >= entranceStartedAt + ENTRANCE_MAX_SECONDS * 1000 + ENTRANCE_DURATION_MS) {
+        finishEntrance();
+      }
 
-      let moving = mounting;
+      let moving = mounting || entranceStartedAt !== null;
       const g = lattice.metrics.gap;
       for (const entry of pool.values()) {
+        // Hidden/throttled frames may skip animationend; do not retain expired entry masks.
+        if (entry.el.coverMotion && !sampleCoverMotion(entry.el.coverMotion, nowMs, reducedMotion).running) {
+          entry.el.coverMotion = null;
+          entry.el.root.classList.remove('poster--enter', 'poster--fade');
+          surfaceDirty = true;
+        }
         const spring = entry.spring;
         if (spring) {
           surfaceDirty = true;
@@ -869,7 +901,8 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
         }
         const painted = surface?.render(camera, [...pool.values()].map(entry => ({ el: entry.el,
           tile: tiles[entry.tileIndex], current: entry.tileIndex === currentTile })), visualOptions, dt,
-          surfaceDirty || projectionChanged || moving || depthFrame.changed, nowMs, depth.pose);
+          surfaceDirty || projectionChanged || moving || depthFrame.changed, nowMs, depth.pose,
+          entranceStartedAt !== null || (entranceCompletionPending && pendingMounts.length > 0));
         world.dataset.fisheyeSurface = String(painted?.ready === true);
         if (painted?.moving) moving = true;
         surfaceDirty = false;
@@ -892,11 +925,17 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
         }
       }
       // One settling frame flushes deferred cover sizes after the final immediate move.
+      if (entranceCompletionPending && pendingMounts.length === 0) {
+        entranceCompletionPending = false;
+        handlers.onEntranceComplete?.();
+      }
       return moving || viewChanged || uiAnimating || depthFrame.moving;
     },
 
     playEntrance() {
-      if (entrance === 'idle' && !reducedMotion) entrance = 'pending';
+      if (entrance !== 'idle') return;
+      entrance = 'pending';
+      handlers.onRenderNeeded?.();
     },
 
     expandedVisible(camera) {
@@ -921,6 +960,11 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
     pointerPoint(clientX, clientY) { return depth.pointerPoint(clientX, clientY); },
 
     clear() {
+      if (entranceStartedAt !== null || entrance === 'pending' || entranceCompletionPending) {
+        entrance = 'played';
+        entranceCompletionPending = false;
+        handlers.onEntranceComplete?.();
+      }
       uiProjection.clear();
       surface?.hide();
       surfaceDirty = true;
@@ -931,7 +975,9 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       pool.clear(); free.length = 0; pendingMounts.length = 0; staleEntries.length = 0;
       lattice = null; tiles = []; expanded = null; focused = null; currentTile = null;
       collapsing = null; hoverId = null; focusPending = false; settlePending = false;
-      needsCull = true; layoutDirty = true; culledOnce = false; lastNow = null; entrance = 'idle';
+      needsCull = true; layoutDirty = true; culledOnce = false; lastNow = null;
+      entranceStartedAt = null; entranceDelays.clear();
+      delete field.dataset.entering;
       lastView.x = lastView.y = lastView.scale = lastView.width = lastView.height = lastView.amount = NaN;
     },
 
@@ -948,6 +994,9 @@ export function createPosterWall(world: HTMLElement, handlers: PosterWallHandler
       pendingMounts.length = 0;
       staleEntries.length = 0;
       free.length = 0;
+      entranceStartedAt = null; entranceDelays.clear();
+      entranceCompletionPending = false;
+      delete field.dataset.entering;
       lattice = null;
       tiles = [];
       expanded = null;

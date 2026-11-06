@@ -26,7 +26,7 @@ const message = (title: string, body: string): [HTMLElement, HTMLElement] => {
   return [heading, paragraph];
 };
 
-export const createStateOverlay = (container: HTMLElement, host: HTMLElement): StateOverlay => {
+export const createStateOverlay = (container: HTMLElement, host: HTMLElement, onUnavailable?: () => void): StateOverlay => {
   let notice: HTMLElement | null = null;
   return {
     show(state, detail) {
@@ -35,6 +35,7 @@ export const createStateOverlay = (container: HTMLElement, host: HTMLElement): S
         container.hidden = true;
         return;
       }
+      if (state !== 'booting') onUnavailable?.();
       container.hidden = false;
       container.dataset.state = state;
       if (state === 'booting') {

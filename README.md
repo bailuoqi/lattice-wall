@@ -2,7 +2,7 @@
 
 English · [简体中文](./README.zh-CN.md)
 
-Version **1.3.3** is a single sandboxed plug-in package, content id `echo.lattice-wall`.
+Version **1.4.0** is a single sandboxed plug-in package, content id `echo.lattice-wall`.
 It keeps the original host UI entry and immersive track/album walls. Playback speed and
 desktop wallpaper use the new ECHOSteam plug-in SDK APIs; fisheye and HUD are preserved.
 This requires an ECHOSteam build that includes those APIs.
@@ -47,6 +47,8 @@ keep a locate button.
 
 Re-import the local package to update and approve `library:read`.
 
+Opening the wall assembles random black tiles that quickly reveal their covers. Transparent compositing over the previous ECHO page requires a host build with transparent Lattice panel support; older hosts retain an opaque panel shell.
+
 ## License and source
 
 Lattice Wall is licensed under the **GNU Affero General Public License, version 3
@@ -70,9 +72,11 @@ The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
   cards. Libraries larger than 200 page. Tracks that share a cover are spread
   across the wall instead of sitting next to each other. `Ctrl + Space`
   opens the function panel to search and turn pages.
-- 12×8 blocks built from five templates with hashed mirroring so
-  adjacent blocks never repeat; a pre-solved reflow table moves the other eleven
-  cards aside when one expands to 6×6.
+- 20×12 blocks of 30 cards built from five solver-generated templates with hashed
+  mirroring so adjacent blocks never repeat. The offline solver searches the whole block
+  instead of a fixed 12×8 box and scores layouts for looks: no long straight gutters, no
+  four-way crossings, a balanced size mix and heroes kept apart. When a card expands to
+  6×6 it grows in place and only a local neighbourhood of cards re-tiles around it.
   Long portrait cards use 3×6 cells; wide banners use 6×3 cells.
 - Expanded card: title, artist, library badge, previous / play-pause / next;
   a play button for non-current tracks. The seek slider and time readout appear
@@ -95,9 +99,12 @@ The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
   (neutral black or an explicit custom colour and intensity), cell size, lyrics and
   translation; `L` / `V` / `T` toggle lights-out / vignette / tint from the
   keyboard and write back to the host settings.
-- The function panel has Browse, Playback, Appearance and Lighting tabs, with a
-  configurable panel-local shortcut (default `Ctrl + Space`). Covers can always
-  show their titles; tint supports uniform, diagonal and vertical modes.
+- The function panel is a monochrome, editorial-style sheet (inverted on light hosts) with
+  Browse, Playback, Appearance, Lighting and General pages in a sidebar. Each page groups
+  settings into ruled sections; dependent options sit indented under the switch they rely on
+  and dim with a reason while inactive. The panel-local shortcut is configurable (default
+  `Ctrl + Space`), and General lists the wall keys. Covers can always show their titles; tint
+  supports uniform, diagonal and vertical modes.
 - Album cards share the title/lyrics transition with track cards. Separate buttons
   switch between the scrolling track list and the playing album's lyrics, or hide
   both while keeping playback controls available. The canvas stays black in both
@@ -105,7 +112,7 @@ The vendored ECHO Workshop SDK retains its [MIT license](./.echo-sdk/LICENSE).
 
 These UI refinements were adapted from ECHOSteam and the supplied theme sources.
 `npm run check` builds and validates the single plug-in package in `content/`.
-The function panel provides a 0.5×–2× speed slider and a host-owned desktop-wall switch.
+The function panel provides a 0.5×–2× speed slider (Playback) and a host-owned desktop-wall switch (General).
 Use `npm run package:source` followed by `npm run sync` to refresh the corresponding source inventory.
 The main panel and desktop entry both use the standard opaque plug-in SDK bridge.
 
@@ -122,7 +129,7 @@ the last camera position (< 1 KB).
 
 ```powershell
 npm ci
-npm run reflows      # regenerate source/panel/geometry/blockReflows.json
+npm run reflows      # regenerate source/panel/geometry/blockLayouts.json
 npm test             # typecheck, node:test suites, build, purity gate, SDK fixtures
 npm run check        # build + sync content/ + SDK quality gate
 npm run dev          # local browser harness with a mock host (see below)
@@ -195,11 +202,11 @@ source/panel/        TypeScript sources (not packaged)
   albums/            album browser, details, bounded page model and panel entry
   types.ts           shared module contracts
   host/              bridge, playback clock, library / queue models, settings
-  geometry/          block templates, reflow table, infinite lattice
+  geometry/          solved block layouts and reflows, infinite lattice
   wall/              camera, springs, pointer, keyboard, poster DOM, controls
   lyrics/            timeline model and word-highlight view
 source/styles/       stylesheets concatenated in filename order
-scripts/             reflow solver, node:test suites, purity gate, dev harness
+scripts/             layout solver, node:test suites, purity gate, dev harness
 src/                 packaged sandbox files (plugin.js, panel.html, built css/js)
 content/             generated Workshop item (echo.workshop.json + community.echo)
 ```

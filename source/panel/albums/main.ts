@@ -13,6 +13,7 @@ import { createPosterWall } from '../wall/posterWall.ts';
 import { attachPointerPan } from '../wall/pointerPan.ts';
 import { attachKeyboardNav } from '../wall/keyboardNav.ts';
 import { createStateOverlay } from '../stateOverlay.ts';
+import { createWallOpening } from '../wallOpening.ts';
 import { ALBUM_PAGE_SIZE, ALBUM_PROBES, albumTiles, createPageLoader, currentAlbumIndex } from './albumModel.ts';
 import { createControlPanel } from '../controlPanel.ts';
 import { createAlbumDetails } from './albumDetails.ts';
@@ -25,7 +26,8 @@ export async function startLatticeAlbumWall(echo: WallHostApi, signal?: AbortSig
   const state = document.getElementById('state')!;
   const root = document.getElementById('lattice')!;
   const locate = document.getElementById('locate') as HTMLButtonElement;
-  const overlay = createStateOverlay(state, root);
+  const opening = createWallOpening(document.body);
+  const overlay = createStateOverlay(state, root, opening.finish);
   const bridge = createHostBridge(echo, { probes: ALBUM_PROBES });
   // Exit is available even if the host refuses library access or boot fails.
   const earlyExit = (event: KeyboardEvent) => {
@@ -34,6 +36,7 @@ export async function startLatticeAlbumWall(echo: WallHostApi, signal?: AbortSig
   document.addEventListener('keydown', earlyExit);
   const boot = await bridge.boot().catch(() => null);
   if (signal?.aborted) {
+    opening.finish();
     document.removeEventListener('keydown', earlyExit);
     bridge.dispose();
     return () => undefined;
@@ -45,6 +48,7 @@ export async function startLatticeAlbumWall(echo: WallHostApi, signal?: AbortSig
     return () => undefined;
   }
   applyContext(boot.context);
+  opening.configure(boot.context);
   if (boot.missing.length) {
     document.removeEventListener('keydown', earlyExit);
     overlay.show('denied', { missing: [...new Set(boot.missing)] });
@@ -195,6 +199,7 @@ export async function startLatticeAlbumWall(echo: WallHostApi, signal?: AbortSig
     requestFrame();
   }
   const wall = createPosterWall(world, {
+    onEntranceComplete: opening.finish,
     onRenderNeeded: requestFrame,
     onActivate: expand,
     onFocusChange: () => undefined,
@@ -269,7 +274,7 @@ export async function startLatticeAlbumWall(echo: WallHostApi, signal?: AbortSig
         world.style.transform = camera.transform();
         wall.setFocus(instance);
       }
-      wall.playEntrance(performance.now());
+      if (!context.desktop) wall.playEntrance(performance.now());
       requestFrame();
     } catch {
       if (disposed) return;
@@ -403,7 +408,7 @@ export async function startLatticeAlbumWall(echo: WallHostApi, signal?: AbortSig
   void loadPage(1, '');
   const dispose = (): void => {
     if (disposed) return;
-    disposed = true; frames.dispose(); loader.cancel(); camera.stop();
+    disposed = true; opening.finish(); frames.dispose(); loader.cancel(); camera.stop();
     window.removeEventListener('pagehide', dispose);
     signal?.removeEventListener('abort', dispose);
     lattice = null;

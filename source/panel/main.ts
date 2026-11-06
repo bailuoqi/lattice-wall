@@ -41,6 +41,7 @@ import {
 import { createLyricsTransition } from './lyrics/lyricsTransition.ts';
 import { createLyricsView } from './lyrics/lyricsView.ts';
 import { createStateOverlay } from './stateOverlay.ts';
+import { createWallOpening } from './wallOpening.ts';
 
 const PANEL_TITLE = 'Lattice · 曲库拼贴墙';
 const FLY_MS = 420;
@@ -58,6 +59,7 @@ const byId = <T extends HTMLElement>(id: string): T => {
 
 export const startLatticeLibraryWall = async (echo: WallHostApi, signal?: AbortSignal): Promise<() => void> => {
   const root = document.body;
+  const opening = createWallOpening(root);
   let disposed = false;
   let wallAnimating = false;
   const frameIntervalMs = (): number => root.dataset.dragging !== 'true' && !camera.animating && !wallAnimating ? 33 : INTERACTIVE_FRAME_MS;
@@ -65,7 +67,7 @@ export const startLatticeLibraryWall = async (echo: WallHostApi, signal?: AbortS
   const world = byId<HTMLDivElement>('world');
   const locate = byId<HTMLButtonElement>('locate');
   const stateEl = byId<HTMLElement>('state');
-  const overlay = createStateOverlay(stateEl, byId<HTMLElement>('lattice'));
+  const overlay = createStateOverlay(stateEl, byId<HTMLElement>('lattice'), opening.finish);
   const bridge = createHostBridge(echo);
   bridge.onError((message) => console.warn('[lattice-wall]', message));
 
@@ -81,13 +83,15 @@ export const startLatticeLibraryWall = async (echo: WallHostApi, signal?: AbortS
     boot = await bridge.boot();
   } catch {
     if (!signal?.aborted) setState('denied', { missing: [] });
+    else opening.finish();
     bridge.dispose();
     return () => undefined;
   }
 
-  if (signal?.aborted) { bridge.dispose(); return () => undefined; }
+  if (signal?.aborted) { opening.finish(); bridge.dispose(); return () => undefined; }
 
   applyContext(boot.context);
+  opening.configure(boot.context);
   let context = boot.context;
   let settings: LatticeSettings = resolveSettings(boot.settings);
   applyAppearance(settings);
@@ -403,6 +407,7 @@ export const startLatticeLibraryWall = async (echo: WallHostApi, signal?: AbortS
   // ---- wall / controls ---------------------------------------------------------------------------
   const wall = createPosterWall(world, {
     onRenderNeeded: requestFrame,
+    onEntranceComplete: opening.finish,
     onActivate: (instance) => expand(instance),
     onFocusChange: (instance) => { focused = instance; },
     onExpandSettled: () => mountExpandedUi(),
@@ -516,7 +521,7 @@ export const startLatticeLibraryWall = async (echo: WallHostApi, signal?: AbortS
       initialCamera();
       wallReady = true;
       setState('ready');
-      wall.playEntrance(now());
+      if (!context.desktop) wall.playEntrance(now());
       requestFrame();
     } catch (error) {
       wallReady = false;
@@ -762,6 +767,7 @@ export const startLatticeLibraryWall = async (echo: WallHostApi, signal?: AbortS
   const dispose = (): void => {
     if (disposed) return;
     disposed = true;
+    opening.finish();
     wallReady = false;
     frames.dispose();
     cancelAnimationFrame(lyricsOpenFrame);

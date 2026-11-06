@@ -330,10 +330,31 @@ body[data-lighting="daytime"] .world:has(> .poster[data-expanded="true"]) .poste
   transform: translateZ(0);
 }
 
-/* Entrance wave + fade-in for cards culled in later ------------------------------------------- */
+/* App entry: each tile appears in place, black first, then quickly uncovers its artwork. */
 
-.poster--enter .poster__body{
-  animation: poster-enter .45s cubic-bezier(.2, .8, .2, 1) both;
+.poster--enter{
+  animation: poster-enter .2s linear both;
+  animation-delay: var(--enter-delay, 0s);
+}
+
+.poster--enter::after{
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: #000;
+  pointer-events: none;
+  animation: poster-enter-black .2s both;
+  animation-delay: var(--enter-delay, 0s);
+}
+
+.poster.poster--enter .poster__body{ transform: none; transition: none; }
+
+.world[data-fisheye-surface="true"] .poster--enter::after{ display: none; }
+
+.poster--enter > .poster__expanded,
+.poster--enter > .poster__caption{
+  animation: poster-enter-content .2s both;
   animation-delay: var(--enter-delay, 0s);
 }
 
@@ -342,15 +363,19 @@ body[data-lighting="daytime"] .world:has(> .poster[data-expanded="true"]) .poste
 }
 
 @keyframes poster-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0);
-  }
+  0% { opacity: 0; }
+  .01%, 100% { opacity: 1; }
+}
 
-  to {
-    opacity: 1;
-    transform: none;
-  }
+/* 40 ms of solid black, followed by a 160 ms ease-out reveal (coverMotion.ts). */
+@keyframes poster-enter-black {
+  0%, 20% { opacity: 1; animation-timing-function: ease-out; }
+  100% { opacity: 0; }
+}
+
+@keyframes poster-enter-content {
+  0%, 20% { opacity: 0; animation-timing-function: ease-out; }
+  100% { opacity: 1; }
 }
 
 @keyframes poster-fade {
@@ -363,11 +388,12 @@ body[data-lighting="daytime"] .world:has(> .poster[data-expanded="true"]) .poste
   }
 }
 
-/* Reduced motion: no hover scale, no wave, no springs (JS snaps), keep the hover filter --------- */
+/* Reduced motion: no hover scale, no entrance, no springs (JS snaps), keep the hover filter ----- */
 
 .world[data-reduced-motion="true"] .poster,
 body[data-reduced-motion="true"] .poster{
   transition: none;
+  animation: none;
 }
 
 .world[data-reduced-motion="true"] .poster .poster__body,
@@ -394,3 +420,9 @@ body[data-reduced-motion="true"] .poster .poster__lights{
   transition: none;
   animation: none;
 }
+
+.world[data-reduced-motion="true"] .poster--enter::after,
+body[data-reduced-motion="true"] .poster--enter::after{ display: none; }
+
+.world[data-reduced-motion="true"] .poster .poster__caption,
+body[data-reduced-motion="true"] .poster .poster__caption{ animation: none; }

@@ -18,6 +18,9 @@
   background: var(--wall-background);
 }
 
+/* Unfilled areas reveal the actual previous ECHO page, not a substitute colour. */
+body[data-opening="true"] .field{ background: transparent; }
+
 body[data-dragging="true"] .field{
   cursor: grabbing;
 }
@@ -92,3 +95,6 @@ body[data-lighting="daytime"] .field__vignette{
 html[data-color-scheme="light"] .field__vignette{
   background: radial-gradient(ellipse at center, transparent 46%, rgb(0 0 0 / 48%) 100%);
 }
+
+body[data-opening="true"] .field__vignette,
+body[data-opening="true"] .wall-depth-scene::after{ opacity: 0; transition: none; }

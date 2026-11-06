@@ -4,12 +4,12 @@
  * the pure helpers can be imported from Node tests.
  */
 
-import type { Camera, ExpandedContent, GridRect, PixelRect, Tile } from '../types.ts';
+import type { Camera, ExpandedContent, PixelRect, Tile } from '../types.ts';
 import { createCoverSwapQueue, createPosterCover, type CoverSwapQueue, type PosterCover } from './posterCover.ts';
 import type { CoverMotion } from './coverMotion.ts';
 
-export const ENTRANCE_STEP_SECONDS = 0.034;
-export const ENTRANCE_MAX_SECONDS = 0.34;
+export const ENTRANCE_STEP_SECONDS = 0.055;
+export const ENTRANCE_MAX_SECONDS = 0.8;
 
 // ---------------------------------------------------------------------------------------------------
 // Pure helpers
@@ -58,11 +58,16 @@ export function formatTime(seconds: number): string {
   return `${minutes}:${rest}`;
 }
 
-/** Diagonal wave delay: grid steps from the viewport's top-left corner, capped (SPEC §2.1, §6). */
-export function entranceDelaySeconds(rect: GridRect, leftCol: number, topRow: number): number {
-  const steps = Math.max(0, rect.col - leftCol + (rect.row - topRow));
-  const delay = Math.min(ENTRANCE_MAX_SECONDS, steps * ENTRANCE_STEP_SECONDS);
-  return Math.round(delay * 1000) / 1000;
+/** Shuffle the whole first viewport before mounting so the DOM budget cannot determine reveal order. */
+export function entranceDelaysSeconds(ids: readonly string[], random = Math.random): Map<string, number> {
+  const shuffled = [...new Set(ids)];
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const other = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[other]] = [shuffled[other]!, shuffled[index]!];
+  }
+  const step = shuffled.length > 1
+    ? Math.min(ENTRANCE_STEP_SECONDS, ENTRANCE_MAX_SECONDS / (shuffled.length - 1)) : 0;
+  return new Map(shuffled.map((id, index) => [id, Math.round(index * step * 1000) / 1000]));
 }
 
 /** Scale factors that grow a card by exactly one gap on each axis (SPEC §2.2). */

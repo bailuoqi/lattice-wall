@@ -1,30 +1,20 @@
 import type { DesktopControl, DesktopState } from './host/api.ts';
+import { dimRow, press, switchRow } from './controlPanelUi.ts';
 
 /** Optional host-owned desktop wall; unavailable hosts never show an enabled switch. */
 export function createControlPanelDesktop(desktop: DesktopControl, signal: AbortSignal) {
-  const root = document.createElement('section');
-  root.className = 'control-panel__section';
-  const button = document.createElement('button');
-  button.className = 'control-panel__toggle';
-  button.type = 'button';
-  button.setAttribute('role', 'switch');
-  const label = document.createElement('span');
-  label.textContent = '桌面音乐拼贴墙';
-  const track = document.createElement('span');
-  track.className = 'control-panel__switch';
-  track.setAttribute('aria-hidden', 'true');
-  button.append(label, track);
-  const hint = document.createElement('p');
-  hint.className = 'control-panel__hint';
-  root.append(button, hint);
+  const toggle = switchRow({ label: '桌面音乐拼贴墙', hint: '' });
+  const root = toggle.root;
+  const hint = toggle.hint!;
   let enabled = false;
   let busy = false;
   let revision = 0;
   const render = (state: DesktopState): void => {
     enabled = state.enabled === true;
-    button.disabled = state.supported !== true || busy;
-    button.setAttribute('aria-checked', String(enabled));
-    hint.textContent = state.supported ? '由 ECHO 管理桌面窗口与播放。' : '当前 ECHO 或平台暂不支持桌面拼贴墙。';
+    root.disabled = state.supported !== true || busy;
+    dimRow(root, state.supported !== true);
+    press(root, enabled);
+    hint.textContent = state.supported ? '把拼贴墙铺到桌面，窗口与播放由 ECHO 管理' : '当前 ECHO 或平台暂不支持桌面拼贴墙';
   };
   render({ supported: false, enabled: false });
   const open = (): void => {
@@ -35,18 +25,18 @@ export function createControlPanelDesktop(desktop: DesktopControl, signal: Abort
       if (!signal.aborted && current === revision) render({ supported: false, enabled: false });
     });
   };
-  button.addEventListener('click', () => {
-    if (busy || button.disabled) return;
+  root.addEventListener('click', () => {
+    if (busy || root.disabled) return;
     busy = true;
-    button.disabled = true;
+    root.disabled = true;
     const current = ++revision;
     void desktop.set(!enabled).then(state => {
       if (!signal.aborted && current === revision) { busy = false; render(state); }
     }).catch(() => {
       if (!signal.aborted && current === revision) {
         busy = false;
-        hint.textContent = '桌面墙切换失败，请重试。';
-        button.disabled = false;
+        hint.textContent = '桌面墙切换失败，请重试';
+        root.disabled = false;
       }
     });
   }, { signal });

@@ -6,7 +6,7 @@ const root = resolve(import.meta.dirname);
 const sourceRoot = resolve(root, 'source');
 const stylesRoot = resolve(sourceRoot, 'styles');
 const srcRoot = resolve(root, 'src');
-const reflowsPath = resolve(sourceRoot, 'panel', 'geometry', 'blockReflows.json');
+const reflowsPath = resolve(sourceRoot, 'panel', 'geometry', 'blockLayouts.json');
 
 const maximumFileBytes = 512 * 1024;
 const maximumPackageBytes = 2 * 1024 * 1024;
@@ -19,7 +19,7 @@ const licenseBanner = `/*! Lattice Wall | Copyright (c) 2026 Lattice Wall contri
 try {
   await access(reflowsPath);
 } catch {
-  throw new Error('source/panel/geometry/blockReflows.json is missing. Run `npm run reflows` first.');
+  throw new Error('source/panel/geometry/blockLayouts.json is missing. Run `npm run reflows` first.');
 }
 
 await build({

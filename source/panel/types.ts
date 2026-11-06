@@ -51,9 +51,13 @@ export type QueueDiff = {
 // Geometry
 // ---------------------------------------------------------------------------------------------------
 
-export const BLOCK_COLS = 12;
-export const BLOCK_ROWS = 8;
-export const SLOTS_PER_BLOCK = 12;
+/**
+ * Solver-generated blocks (see `scripts/generate-reflows.mjs`), with the same 8-cell average card area
+ * as the old 12×8. Each block holds 30 slots; a 2×2 minimum cell keeps repeated covers apart.
+ */
+export const BLOCK_COLS = 20;
+export const BLOCK_ROWS = 12;
+export const SLOTS_PER_BLOCK = 30;
 export const EXPANDED_SIZE = 6;
 export const TEMPLATE_COUNT = 5;
 
@@ -381,6 +385,8 @@ export type WallVisualOptions = {
 
 export type PosterWallHandlers = {
   onRenderNeeded?(): void;
+  /** First viewport assembly has finished or was cancelled; restore the document background. */
+  onEntranceComplete?(): void;
   /** Card activated by click / Enter / Space. */
   onActivate(instance: Instance): void;
   /** Focus moved (keyboard or programmatic). */
@@ -403,7 +409,7 @@ export type ExpandedContent = {
 
 /**
  * Implemented in `wall/posterWall.ts` (`createPosterWall(world, handlers)`). Owns the `.poster` DOM
- * pool, culling, springs and the entrance wave. It never talks to the host.
+ * pool, culling, springs and the staggered entrance. It never talks to the host.
  */
 export type PosterWall = {
   /**
@@ -423,7 +429,7 @@ export type PosterWall = {
    * still animating (main keeps the rAF loop alive).
    */
   render(camera: Camera, nowMs: number): boolean;
-  /** Play the diagonal entrance wave once (SPEC §2.1). No-op under reduced motion. */
+  /** Assemble black tiles and quickly reveal their covers once per panel entry, never per page. */
   playEntrance(nowMs: number): void;
   /** Whether the expanded card's pixel rect intersects the camera bounds (drives the locate button). */
   expandedVisible(camera: Camera): boolean;
@@ -432,7 +438,7 @@ export type PosterWall = {
   /** Instance for a DOM node inside `.world`, or null. */
   instanceFromTarget(target: EventTarget | null): Instance | null;
   pointerPoint(clientX: number, clientY: number): Point;
-  /** Release all cards and page data while retaining delegated event handlers. */
+  /** Release page data, retaining delegated handlers and the already-played entry state. */
   clear(): void;
   dispose(): void;
 };

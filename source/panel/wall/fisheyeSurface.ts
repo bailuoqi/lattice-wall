@@ -23,6 +23,7 @@ uniform vec3 uSecond;
 uniform vec3 uShadeColor;
 uniform vec4 uPaint;
 uniform float uOpacity;
+uniform float uBlackOpacity;
 uniform float uGradient;
 uniform vec3 uMotion;
 uniform vec3 uBackground;
@@ -51,10 +52,11 @@ void main() {
   float scrim = 1.0 - (1.0 - down) * (1.0 - side) * (1.0 - corner);
   color = mix(color, uShadeColor, scrim * uPaint.z);
   float inside = step(0.0, bodyUv.x) * step(bodyUv.x, 1.0) * step(0.0, bodyUv.y) * step(bodyUv.y, 1.0);
-  color = mix(uBackground, color * (1.0 - uPaint.y), uOpacity * inside);
+  color = mix(uBackground, color * (1.0 - uPaint.y), inside);
   // The album list backdrop belongs to the whole card, independently of cover hover/entrance UVs.
   float albumGradient = vUv.y < 0.2 ? 0.72 * vUv.y / 0.2 : mix(0.72, 0.82, (vUv.y - 0.2) / 0.8);
-  gl_FragColor = vec4(mix(color, uAlbumBackground, albumGradient * uAlbumScrim), 1.0);
+  color = mix(color, uAlbumBackground, albumGradient * uAlbumScrim);
+  gl_FragColor = vec4(color * (1.0 - uBlackOpacity), uOpacity);
 }
 `;
 const LENS = `
@@ -92,7 +94,7 @@ export function createFisheyeSurface(field: HTMLElement, requestFrame: () => voi
   canvas.className = 'fisheye-surface';
   canvas.setAttribute('aria-hidden', 'true');
   canvas.hidden = true;
-  const context = canvas.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false });
+  const context = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false });
   if (!context) return null;
   const gl: WebGLRenderingContext = context;
   const compile = (type: number, source: string): WebGLShader => {
@@ -116,11 +118,11 @@ export function createFisheyeSurface(field: HTMLElement, requestFrame: () => voi
     position: gl.getAttribLocation(value, 'aPosition'), uv: gl.getAttribLocation(value, 'aUv'),
   }]));
   const uniforms = (value: WebGLProgram, names: string[]) => Object.fromEntries(names.map(name => [name, gl.getUniformLocation(value, name)!]));
-  const c = uniforms(cover, ['uImage', 'uHasImage', 'uCrop', 'uFirst', 'uSecond', 'uShadeColor', 'uPaint', 'uOpacity', 'uGradient', 'uMotion', 'uBackground', 'uDepth', 'uAlbumBackground', 'uAlbumScrim']);
+  const c = uniforms(cover, ['uImage', 'uHasImage', 'uCrop', 'uFirst', 'uSecond', 'uShadeColor', 'uPaint', 'uOpacity', 'uBlackOpacity', 'uGradient', 'uMotion', 'uBackground', 'uDepth', 'uAlbumBackground', 'uAlbumScrim']);
   const l = uniforms(lens, ['uImage', 'uBounds', 'uStrength', 'uNormalization']);
   type Texture = { value: WebGLTexture | null; image: HTMLImageElement; waiting: boolean; failed: boolean };
   const textures = new Map<string, Texture>();
-  const paints = new Map<HTMLElement, { value: number[]; alpha: number; offsetY: number; albumScrim: number;
+  const paints = new Map<HTMLElement, { value: number[]; alpha: number; blackOpacity: number; albumScrim: number;
     zoom: number; zoomFrom: number; zoomTarget: number; zoomStart: number }>();
   const colors = new Map<string, [number[], number[]]>();
   let target: WebGLTexture | null = null, framebuffer: WebGLFramebuffer | null = null;
@@ -189,7 +191,7 @@ export function createFisheyeSurface(field: HTMLElement, requestFrame: () => voi
     canvas,
     get needsReplacement() { return restored; },
     hide() { canvas.hidden = true; release(); dirty = true; },
-    render(camera: Camera, cards: SurfaceCard[], visuals: WallVisualOptions, dt: number, changed: boolean, nowMs: number, depth: DepthPose): { ready: boolean; moving: boolean } {
+    render(camera: Camera, cards: SurfaceCard[], visuals: WallVisualOptions, dt: number, changed: boolean, nowMs: number, depth: DepthPose, entering = false): { ready: boolean; moving: boolean } {
       if (disposed || lost) return { ready: false, moving: false };
       let moving = false;
       let paintChanged = false;
@@ -200,13 +202,14 @@ export function createFisheyeSurface(field: HTMLElement, requestFrame: () => voi
         const root = card.el.root, open = root.dataset.expanded === 'true', hover = root.dataset.lensHover === 'true';
         keep.add(root);
         const idle = !open && !card.current && !hover;
-        const targetZoom = !visuals.reducedMotion && !open && (hover || root.dataset.focused === 'true') ? 1 : 0;
+        const targetZoom = !visuals.reducedMotion && !open && !root.classList.contains('poster--enter')
+          && (hover || root.dataset.focused === 'true') ? 1 : 0;
         const targetPaint = [visuals.tint && idle ? Math.min(.85, visuals.tintIntensity) : 0,
           daytime ? 0 : hasExpanded ? (open ? 0 : visuals.lightsOut ? .8 : .34) : visuals.lightsOut && idle ? .72 : 0,
           open ? 1 : 0, open ? 1.18 : hover ? 1.16 : 1];
         let state = paints.get(root);
         if (!state) {
-          state = { value: [...targetPaint], alpha: 1, offsetY: 0, albumScrim: 0, zoom: targetZoom,
+          state = { value: [...targetPaint], alpha: 1, blackOpacity: 0, albumScrim: 0, zoom: targetZoom,
             zoomFrom: targetZoom, zoomTarget: targetZoom, zoomStart: nowMs };
           paints.set(root, state);
           paintChanged = true;
@@ -219,8 +222,8 @@ export function createFisheyeSurface(field: HTMLElement, requestFrame: () => voi
         if (state.albumScrim !== albumScrim) paintChanged = true;
         state.albumScrim = albumScrim;
         const motion = sampleCoverMotion(card.el.coverMotion, nowMs, visuals.reducedMotion);
-        if (state.alpha !== motion.opacity || state.offsetY !== motion.offsetY) paintChanged = true;
-        state.alpha = motion.opacity; state.offsetY = motion.offsetY;
+        if (state.alpha !== motion.opacity || state.blackOpacity !== motion.blackOpacity) paintChanged = true;
+        state.alpha = motion.opacity; state.blackOpacity = motion.blackOpacity;
         if (motion.running) moving = true;
         else card.el.coverMotion = null;
         if (state.zoomTarget !== targetZoom) {
@@ -260,8 +263,10 @@ export function createFisheyeSurface(field: HTMLElement, requestFrame: () => voi
         targetWidth = fw; targetHeight = fh;
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer); gl.viewport(0, 0, fw, fh);
-      gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.useProgram(cover); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.clearColor(0, 0, 0, entering ? 0 : 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      // Keep coverage separate so the lens preserves transparent holes between arriving tiles.
+      gl.useProgram(cover); gl.enable(gl.BLEND);
+      gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.activeTexture(gl.TEXTURE0); gl.uniform1i(c.uImage!, 0);
       const depthScale = 1 + depth.amount * HUD_ART_OVERSCAN;
       gl.uniform3f(c.uDepth!, depth.x * depth.amount * HUD_ART_PARALLAX / depthScale, depth.y * depth.amount * HUD_ART_PARALLAX / depthScale, depthScale);
@@ -296,10 +301,10 @@ export function createFisheyeSurface(field: HTMLElement, requestFrame: () => voi
         gl.uniform3fv(c.uFirst!, colorsForCard[0]); gl.uniform3fv(c.uSecond!, colorsForCard[1]);
         const paint = paints.get(card.el.root)!;
         gl.uniform4fv(c.uPaint!, paint.value); gl.uniform1f(c.uOpacity!, paint.alpha);
+        gl.uniform1f(c.uBlackOpacity!, paint.blackOpacity);
         gl.uniform1f(c.uAlbumScrim!, paint.albumScrim);
         const zoomGap = Math.max(0, card.el.shown.hoverGap) * paint.zoom;
-        gl.uniform3f(c.uMotion!, paint.offsetY / Math.max(1, rect.h),
-          1 + zoomGap / Math.max(1, rect.w), 1 + zoomGap / Math.max(1, rect.h));
+        gl.uniform3f(c.uMotion!, 0, 1 + zoomGap / Math.max(1, rect.w), 1 + zoomGap / Math.max(1, rect.h));
         const x = (rect.x - camera.state.x) * camera.state.scale / (camera.viewport.width / 2 * boundsScale);
         const y = -(rect.y - camera.state.y) * camera.state.scale / (camera.viewport.height / 2 * boundsScale);
         quad(cover, x, y, x + rect.w * camera.state.scale / (camera.viewport.width / 2 * boundsScale), y - rect.h * camera.state.scale / (camera.viewport.height / 2 * boundsScale));

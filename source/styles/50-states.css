@@ -12,11 +12,6 @@ body[data-state='error'] .field{
 
 body[data-state='ready'] .field{
   opacity: 1;
-  transition: opacity 0.35s ease;
-}
-
-body[data-reduced-motion='true'][data-state='ready'] .field{
-  transition: none;
 }
 
 .state{
@@ -35,6 +30,12 @@ body[data-reduced-motion='true'][data-state='ready'] .field{
 
 .state[hidden] {
   display: none;
+}
+
+body[data-opening="true"] .state,
+body[data-opening="true"] .locate,
+body[data-opening="true"] .notice {
+  visibility: hidden;
 }
 
 .state__title{

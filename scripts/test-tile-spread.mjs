@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { SLOTS_PER_BLOCK } from '../source/panel/types.ts';
 import { createLattice, planLatticeSlots } from '../source/panel/geometry/lattice.ts';
 import {
   createSpreadLattice,
@@ -90,7 +91,8 @@ describe('spreadSlotToTile', () => {
   });
 
   test('unique covers stay a bijection when the cell has no leftover slots', () => {
-    const tiles = Array.from({ length: 12 }, (_, i) => tile(i, { albumKey: `solo-${i}` }));
+    // The smallest cell is 2 × 2 blocks.
+    const tiles = Array.from({ length: 4 * SLOTS_PER_BLOCK }, (_, i) => tile(i, { albumKey: `solo-${i}` }));
     const plan = planLatticeSlots(tiles.length, METRICS);
     const mapping = spreadSlotToTile(tiles.map(tileCoverKey), plan);
     assert.deepEqual([...mapping].sort((a, b) => a - b), tiles.map((_, i) => i));
@@ -100,7 +102,7 @@ describe('spreadSlotToTile', () => {
     const tiles = Array.from({ length: 24 }, (_, i) => tile(i, { albumKey: i < 12 ? 'a' : 'b' }));
     const keys = tiles.map(tileCoverKey);
     const plan = planLatticeSlots(tiles.length, METRICS);
-    const sequential = keys.map((_, i) => i % keys.length);
+    const sequential = Array.from({ length: plan.cellSlotCount }, (_, i) => i % keys.length);
     const spread = spreadSlotToTile(keys, plan);
     const sequentialMin = minSameCoverDistance(sequential, keys, plan.centers, plan.cellPixelSize);
     const spreadMin = minSameCoverDistance(spread, keys, plan.centers, plan.cellPixelSize);
@@ -136,8 +138,8 @@ describe('createSpreadLattice', () => {
     assert.equal(plan.rects[slot]?.w, plan.rects[slot]?.h);
 
     const lattice = createSpreadLattice(tiles, METRICS, { tileIndex: 3, near });
-    const pinned = lattice.instanceAt(Math.floor(slot / 12) % lattice.cellCols,
-      Math.floor(Math.floor(slot / 12) / lattice.cellCols), slot % 12, null);
+    const block = Math.floor(slot / SLOTS_PER_BLOCK);
+    const pinned = lattice.instanceAt(block % lattice.cellCols, Math.floor(block / lattice.cellCols), slot % SLOTS_PER_BLOCK, null);
     assert.equal(pinned.tileIndex, 3);
     assert.equal(pinned.rect.w, pinned.rect.h);
     const landed = lattice.nearestInstance(3, near, null);

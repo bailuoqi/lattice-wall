@@ -1,4 +1,7 @@
 /** Timings match the native cover animations in 20-poster.css. */
+export const ENTRANCE_BLACK_HOLD_MS = 40;
+export const ENTRANCE_REVEAL_MS = 160;
+export const ENTRANCE_DURATION_MS = ENTRANCE_BLACK_HOLD_MS + ENTRANCE_REVEAL_MS;
 export type CoverMotion = { kind: 'enter' | 'fade'; startedAt: number; delayMs: number };
 
 export function coverEase(progress: number, x1 = .2, y1 = .8, x2 = .2, y2 = 1): number {
@@ -15,9 +18,13 @@ export function coverEase(progress: number, x1 = .2, y1 = .8, x2 = .2, y2 = 1): 
 }
 
 export function sampleCoverMotion(motion: CoverMotion | null, nowMs: number, reducedMotion: boolean) {
-  if (!motion || reducedMotion) return { opacity: 1, offsetY: 0, running: false };
-  const duration = motion.kind === 'enter' ? 450 : 120;
-  const progress = Math.min(1, Math.max(0, (nowMs - motion.startedAt - motion.delayMs) / duration));
-  const eased = motion.kind === 'enter' ? coverEase(progress) : coverEase(progress, 0, 0, .58, 1);
-  return { opacity: eased, offsetY: motion.kind === 'enter' ? 18 * (1 - eased) : 0, running: progress < 1 };
+  if (!motion || reducedMotion) return { opacity: 1, blackOpacity: 0, running: false };
+  const elapsed = nowMs - motion.startedAt - motion.delayMs;
+  if (motion.kind === 'enter') {
+    const progress = Math.min(1, Math.max(0, (elapsed - ENTRANCE_BLACK_HOLD_MS) / ENTRANCE_REVEAL_MS));
+    return { opacity: elapsed < 0 ? 0 : 1, blackOpacity: 1 - coverEase(progress, 0, 0, .58, 1),
+      running: elapsed < ENTRANCE_DURATION_MS };
+  }
+  const progress = Math.min(1, Math.max(0, elapsed / 120));
+  return { opacity: coverEase(progress, 0, 0, .58, 1), blackOpacity: 0, running: progress < 1 };
 }

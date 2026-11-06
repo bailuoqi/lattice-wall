@@ -1,174 +1,59 @@
 /**
- * Hand-designed block templates for the Lattice Wall (SPEC §5).
+ * Block templates and expansion reflows (SPEC §5), searched offline by `scripts/generate-reflows.mjs`
+ * on the whole BLOCK_COLS × BLOCK_ROWS block rather than hand-drawn in a 12×8 box.
  *
- * A block is BLOCK_COLS × BLOCK_ROWS grid cells holding exactly SLOTS_PER_BLOCK cards. Each template
- * lists its 12 rects in reading order (row-major by top-left corner) so consecutive queue items flow
- * left-to-right, top-to-bottom through the block. The five templates put their hero card in
- * different places (left, right, centre, top, bottom); mirroring multiplies that into 20 looks.
+ * Each template lists its SLOTS_PER_BLOCK rects in reading order (row-major by top-left corner) so
+ * consecutive queue items flow left-to-right, top-to-bottom. Mirroring multiplies the templates into
+ * TEMPLATE_COUNT × 4 looks. A reflow is stored as the rects that change when one slot grows to
+ * EXPANDED_SIZE × EXPANDED_SIZE; every other card keeps its template rect.
  */
 
-import { BLOCK_COLS, BLOCK_ROWS, SLOTS_PER_BLOCK, TEMPLATE_COUNT, type Mirror } from '../types.ts';
+import { BLOCK_COLS, BLOCK_ROWS, EXPANDED_SIZE, SLOTS_PER_BLOCK, TEMPLATE_COUNT, type Mirror } from '../types.ts';
+import { type TemplateRect } from './blockShapes.ts';
+import layouts from './blockLayouts.json' with { type: 'json' };
 
-export type TemplateRect = { col: number; row: number; w: number; h: number };
+export { ALLOWED_SIZES, isAllowedSize, isExactCover, type TemplateRect } from './blockShapes.ts';
 
-/** Card sizes (w × h, grid cells) a template or reflow layout may use. */
-export const ALLOWED_SIZES: ReadonlyArray<readonly [w: number, h: number]> = [
-  [2, 2],
-  [2, 3],
-  [3, 2],
-  [2, 4],
-  [4, 2],
-  [3, 4],
-  [4, 3],
-  [4, 4],
-  [6, 3],
-  [3, 6],
-  [6, 4],
-  [4, 6],
-];
+const VALUES_PER_RECT = 4;
+const VALUES_PER_DELTA = 5;
 
-export function isAllowedSize(w: number, h: number): boolean {
-  for (const size of ALLOWED_SIZES) {
-    if (size[0] === w && size[1] === h) return true;
-  }
-  return false;
+if (layouts.block[0] !== BLOCK_COLS || layouts.block[1] !== BLOCK_ROWS
+  || layouts.slots !== SLOTS_PER_BLOCK || layouts.expanded !== EXPANDED_SIZE) {
+  throw new Error('blockLayouts.json was generated for a different block geometry; run `npm run reflows`');
+}
+if (layouts.templates.length !== TEMPLATE_COUNT || layouts.reflows.length !== TEMPLATE_COUNT) {
+  throw new Error(`blockLayouts.json must define ${TEMPLATE_COUNT} templates and reflow tables`);
 }
 
-// Template 0 — a 4×4 hero left, two portraits beside it and a wider 3×6 pillar on the right.
-//   A A A A B B B C C D D D
-//   A A A A B B B C C D D D
-//   A A A A B B B C C D D D
-//   A A A A B B B C C D D D
-//   E E E F F F F G G D D D
-//   E E E F F F F G G D D D
-//   H H I I J J J J K K L L
-//   H H I I J J J J K K L L
-const TEMPLATE_HERO_LEFT: readonly TemplateRect[] = [
-  { col: 0, row: 0, w: 4, h: 4 },
-  { col: 4, row: 0, w: 3, h: 4 },
-  { col: 7, row: 0, w: 2, h: 4 },
-  { col: 9, row: 0, w: 3, h: 6 },
-  { col: 0, row: 4, w: 3, h: 2 },
-  { col: 3, row: 4, w: 4, h: 2 },
-  { col: 7, row: 4, w: 2, h: 2 },
-  { col: 0, row: 6, w: 2, h: 2 },
-  { col: 2, row: 6, w: 2, h: 2 },
-  { col: 4, row: 6, w: 4, h: 2 },
-  { col: 8, row: 6, w: 2, h: 2 },
-  { col: 10, row: 6, w: 2, h: 2 },
-];
-
-// Template 1 — hero right (4×6 portrait) with two 4×3 landscape cards stacked on the left.
-//   A A B B B C C C D D D D
-//   A A B B B C C C D D D D
-//   E E E E F F G G D D D D
-//   E E E E F F G G D D D D
-//   E E E E H H G G D D D D
-//   I I I I H H G G D D D D
-//   I I I I J J J J K K L L
-//   I I I I J J J J K K L L
-const TEMPLATE_HERO_RIGHT: readonly TemplateRect[] = [
-  { col: 0, row: 0, w: 2, h: 2 },
-  { col: 2, row: 0, w: 3, h: 2 },
-  { col: 5, row: 0, w: 3, h: 2 },
-  { col: 8, row: 0, w: 4, h: 6 },
-  { col: 0, row: 2, w: 4, h: 3 },
-  { col: 4, row: 2, w: 2, h: 2 },
-  { col: 6, row: 2, w: 2, h: 4 },
-  { col: 4, row: 4, w: 2, h: 2 },
-  { col: 0, row: 5, w: 4, h: 3 },
-  { col: 4, row: 6, w: 4, h: 2 },
-  { col: 8, row: 6, w: 2, h: 2 },
-  { col: 10, row: 6, w: 2, h: 2 },
-];
-
-// Template 2 — a thicker 6×3 centre banner flanked by 3×4 portraits and smaller cards.
-//   A A A B B C C C C D D D
-//   A A A B B C C C C D D D
-//   A A A B B C C C C D D D
-//   A A A E E E E E E D D D
-//   F F F E E E E E E G G G
-//   F F F E E E E E E G G G
-//   H H H I I J J K K L L L
-//   H H H I I J J K K L L L
-const TEMPLATE_HERO_CENTRE: readonly TemplateRect[] = [
-  { col: 0, row: 0, w: 3, h: 4 },
-  { col: 3, row: 0, w: 2, h: 3 },
-  { col: 5, row: 0, w: 4, h: 3 },
-  { col: 9, row: 0, w: 3, h: 4 },
-  { col: 3, row: 3, w: 6, h: 3 },
-  { col: 0, row: 4, w: 3, h: 2 },
-  { col: 9, row: 4, w: 3, h: 2 },
-  { col: 0, row: 6, w: 3, h: 2 },
-  { col: 3, row: 6, w: 2, h: 2 },
-  { col: 5, row: 6, w: 2, h: 2 },
-  { col: 7, row: 6, w: 2, h: 2 },
-  { col: 9, row: 6, w: 3, h: 2 },
-];
-
-// Template 3 — hero top (6×4) flanked by two 3×4 portraits, small cards along the bottom.
-//   A A A B B B B B B C C C
-//   A A A B B B B B B C C C
-//   A A A B B B B B B C C C
-//   A A A B B B B B B C C C
-//   D D E E F F F G G G H H
-//   D D E E F F F G G G H H
-//   I I J J J J K K L L H H
-//   I I J J J J K K L L H H
-const TEMPLATE_HERO_TOP: readonly TemplateRect[] = [
-  { col: 0, row: 0, w: 3, h: 4 },
-  { col: 3, row: 0, w: 6, h: 4 },
-  { col: 9, row: 0, w: 3, h: 4 },
-  { col: 0, row: 4, w: 2, h: 2 },
-  { col: 2, row: 4, w: 2, h: 2 },
-  { col: 4, row: 4, w: 3, h: 2 },
-  { col: 7, row: 4, w: 3, h: 2 },
-  { col: 10, row: 4, w: 2, h: 4 },
-  { col: 0, row: 6, w: 2, h: 2 },
-  { col: 2, row: 6, w: 4, h: 2 },
-  { col: 6, row: 6, w: 2, h: 2 },
-  { col: 8, row: 6, w: 2, h: 2 },
-];
-
-// Template 4 — hero bottom (6×4), a 4×4 top right, two staggered 2×3 portraits on the left edge.
-//   A A B B B B C C C C D D
-//   A A B B B B C C C C D D
-//   A A E E E E C C C C D D
-//   F F E E E E C C C C D D
-//   F F G G H H H H H H I I
-//   F F G G H H H H H H I I
-//   J J K K H H H H H H L L
-//   J J K K H H H H H H L L
-const TEMPLATE_HERO_BOTTOM: readonly TemplateRect[] = [
-  { col: 0, row: 0, w: 2, h: 3 },
-  { col: 2, row: 0, w: 4, h: 2 },
-  { col: 6, row: 0, w: 4, h: 4 },
-  { col: 10, row: 0, w: 2, h: 4 },
-  { col: 2, row: 2, w: 4, h: 2 },
-  { col: 0, row: 3, w: 2, h: 3 },
-  { col: 2, row: 4, w: 2, h: 2 },
-  { col: 4, row: 4, w: 6, h: 4 },
-  { col: 10, row: 4, w: 2, h: 2 },
-  { col: 0, row: 6, w: 2, h: 2 },
-  { col: 2, row: 6, w: 2, h: 2 },
-  { col: 10, row: 6, w: 2, h: 2 },
-];
-
-export const BLOCK_TEMPLATES: ReadonlyArray<ReadonlyArray<TemplateRect>> = [
-  TEMPLATE_HERO_LEFT,
-  TEMPLATE_HERO_RIGHT,
-  TEMPLATE_HERO_CENTRE,
-  TEMPLATE_HERO_TOP,
-  TEMPLATE_HERO_BOTTOM,
-];
-
-if (BLOCK_TEMPLATES.length !== TEMPLATE_COUNT) {
-  throw new Error(`BLOCK_TEMPLATES must define ${TEMPLATE_COUNT} templates`);
-}
-for (const template of BLOCK_TEMPLATES) {
-  if (template.length !== SLOTS_PER_BLOCK) {
-    throw new Error(`Every block template must define ${SLOTS_PER_BLOCK} slots`);
+function readTemplate(values: readonly number[], index: number): TemplateRect[] {
+  if (values.length !== SLOTS_PER_BLOCK * VALUES_PER_RECT) {
+    throw new Error(`Block template ${index} must define ${SLOTS_PER_BLOCK} slots`);
   }
+  const rects: TemplateRect[] = [];
+  for (let o = 0; o < values.length; o += VALUES_PER_RECT) {
+    rects.push({ col: values[o]!, row: values[o + 1]!, w: values[o + 2]!, h: values[o + 3]! });
+  }
+  return rects;
+}
+
+export const BLOCK_TEMPLATES: ReadonlyArray<ReadonlyArray<TemplateRect>> = layouts.templates.map(readTemplate);
+
+/** Block-local layout of template `template` with `slot` expanded: the template plus the stored delta. */
+export function reflowRects(template: number, slot: number): TemplateRect[] {
+  const base = BLOCK_TEMPLATES[template];
+  const delta = layouts.reflows[template]?.[slot];
+  if (base === undefined || delta === undefined || delta.length % VALUES_PER_DELTA !== 0) {
+    throw new Error(`blockLayouts.json has no reflow for template ${template} slot ${slot}`);
+  }
+  const rects = base.map((rect) => ({ ...rect }));
+  for (let o = 0; o < delta.length; o += VALUES_PER_DELTA) {
+    const index = delta[o]!;
+    if (!Number.isInteger(index) || index < 0 || index >= SLOTS_PER_BLOCK) {
+      throw new Error(`blockLayouts.json has a malformed reflow for template ${template} slot ${slot}`);
+    }
+    rects[index] = { col: delta[o + 1]!, row: delta[o + 2]!, w: delta[o + 3]!, h: delta[o + 4]! };
+  }
+  return rects;
 }
 
 /** Reflect a block-local rect inside the block; the slot order of a layout is unaffected. */
@@ -207,23 +92,4 @@ export function mirrorFor(bc: number, br: number): Mirror {
   h = Math.imul(h, 0x846ca68b);
   h ^= h >>> 16;
   return (h >>> 30) as Mirror;
-}
-
-/** True when `rects` tile the `cols × rows` area with no gap and no overlap. */
-export function isExactCover(rects: ReadonlyArray<TemplateRect>, cols = BLOCK_COLS, rows = BLOCK_ROWS): boolean {
-  const covered = new Uint8Array(cols * rows);
-  let filled = 0;
-  for (const { col, row, w, h } of rects) {
-    if (!Number.isInteger(col) || !Number.isInteger(row) || !Number.isInteger(w) || !Number.isInteger(h)) return false;
-    if (w < 1 || h < 1 || col < 0 || row < 0 || col + w > cols || row + h > rows) return false;
-    for (let r = row; r < row + h; r++) {
-      for (let c = col; c < col + w; c++) {
-        const index = r * cols + c;
-        if (covered[index] === 1) return false;
-        covered[index] = 1;
-        filled++;
-      }
-    }
-  }
-  return filled === cols * rows;
 }

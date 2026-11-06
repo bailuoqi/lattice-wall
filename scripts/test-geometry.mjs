@@ -14,16 +14,22 @@ import {
   isExactCover,
   mirrorFor,
   mirrorRect,
+  reflowRects,
   templateIndexFor,
 } from '../source/panel/geometry/blockTemplates.ts';
 import { createLattice } from '../source/panel/geometry/lattice.ts';
-import reflows from '../source/panel/geometry/blockReflows.json' with { type: 'json' };
+import layouts from '../source/panel/geometry/blockLayouts.json' with { type: 'json' };
 
 const METRICS = { cell: 104, gap: 8 };
 const MIRRORS = [0, 1, 2, 3];
 const TILE_COUNTS = [1, 5, 12, 13, 50, 500];
 const DIRECTIONS = ['left', 'right', 'up', 'down'];
-const reflowsPath = resolve(import.meta.dirname, '..', 'source', 'panel', 'geometry', 'blockReflows.json');
+const layoutsPath = resolve(import.meta.dirname, '..', 'source', 'panel', 'geometry', 'blockLayouts.json');
+const REFLOW_LAYOUTS = TEMPLATE_COUNT * SLOTS_PER_BLOCK * MIRRORS.length;
+// Aesthetic floors for the solved layouts (see scripts/generate-reflows.mjs); a 12×8 block allowed 12.
+const TEMPLATE_GUTTER_LIMIT = 10;
+const REFLOW_GUTTER_LIMIT = 16;
+const REFLOW_SHIFT_LIMIT = 4.5;
 
 function mulberry32(seed) {
   let state = seed >>> 0;
@@ -40,8 +46,48 @@ function sizeKey(rect) {
   return `${rect.w}x${rect.h}`;
 }
 
+/** Longest straight gutter (cells, along an interior grid line) and "+" crossings of a block layout. */
+function gutterStats(layout) {
+  const owner = new Int16Array(BLOCK_COLS * BLOCK_ROWS);
+  layout.forEach(({ col, row, w, h }, index) => {
+    for (let y = row; y < row + h; y++) {
+      for (let x = col; x < col + w; x++) owner[y * BLOCK_COLS + x] = index;
+    }
+  });
+  let longest = 0;
+  for (let y = 1; y < BLOCK_ROWS; y++) {
+    let run = 0;
+    for (let x = 0; x < BLOCK_COLS; x++) {
+      run = owner[(y - 1) * BLOCK_COLS + x] !== owner[y * BLOCK_COLS + x] ? run + 1 : 0;
+      longest = Math.max(longest, run);
+    }
+  }
+  for (let x = 1; x < BLOCK_COLS; x++) {
+    let run = 0;
+    for (let y = 0; y < BLOCK_ROWS; y++) {
+      run = owner[y * BLOCK_COLS + x - 1] !== owner[y * BLOCK_COLS + x] ? run + 1 : 0;
+      longest = Math.max(longest, run);
+    }
+  }
+  let crosses = 0;
+  for (let y = 1; y < BLOCK_ROWS; y++) {
+    for (let x = 1; x < BLOCK_COLS; x++) {
+      const a = owner[(y - 1) * BLOCK_COLS + x - 1];
+      const b = owner[(y - 1) * BLOCK_COLS + x];
+      const c = owner[y * BLOCK_COLS + x - 1];
+      const d = owner[y * BLOCK_COLS + x];
+      if (a !== b && c !== d && a !== c && b !== d) crosses++;
+    }
+  }
+  return { longest, crosses };
+}
+
+function centreOf(rect) {
+  return { x: rect.col + rect.w / 2, y: rect.row + rect.h / 2 };
+}
+
 function reflowLayout(template, slot, mirror) {
-  return reflows.tables[template][slot].map(([col, row, w, h]) => mirrorRect({ col, row, w, h }, mirror));
+  return reflowRects(template, slot).map((rect) => mirrorRect(rect, mirror));
 }
 
 /** Instances of the 3×3 block neighbourhood centred on (bc, br). */
@@ -141,6 +187,14 @@ describe('block templates', () => {
     });
   });
 
+  test('read as a collage: short straight gutters and almost no four-way crossings', () => {
+    BLOCK_TEMPLATES.forEach((template, index) => {
+      const { longest, crosses } = gutterStats(template);
+      assert.ok(longest <= TEMPLATE_GUTTER_LIMIT, `template ${index} has a ${longest}-cell straight gutter`);
+      assert.ok(crosses <= 1, `template ${index} has ${crosses} four-way crossings`);
+    });
+  });
+
   test('mirrorRect keeps exact cover, sizes and slot order for all four mirrors', () => {
     for (const template of BLOCK_TEMPLATES) {
       for (const mirror of MIRRORS) {
@@ -154,9 +208,9 @@ describe('block templates', () => {
         template.map((rect) => mirrorRect(rect, 3)),
       );
     }
-    assert.deepEqual(mirrorRect({ col: 1, row: 2, w: 3, h: 4 }, 1), { col: 8, row: 2, w: 3, h: 4 });
-    assert.deepEqual(mirrorRect({ col: 1, row: 2, w: 3, h: 4 }, 2), { col: 1, row: 2, w: 3, h: 4 });
-    assert.deepEqual(mirrorRect({ col: 1, row: 0, w: 3, h: 4 }, 3), { col: 8, row: 4, w: 3, h: 4 });
+    assert.deepEqual(mirrorRect({ col: 1, row: 2, w: 3, h: 4 }, 1), { col: BLOCK_COLS - 4, row: 2, w: 3, h: 4 });
+    assert.deepEqual(mirrorRect({ col: 1, row: 2, w: 3, h: 4 }, 2), { col: 1, row: BLOCK_ROWS - 6, w: 3, h: 4 });
+    assert.deepEqual(mirrorRect({ col: 1, row: 0, w: 3, h: 4 }, 3), { col: BLOCK_COLS - 4, row: BLOCK_ROWS - 4, w: 3, h: 4 });
   });
 
   test('templateIndexFor is in range and differs for every adjacent block, negatives included', () => {
@@ -193,15 +247,16 @@ describe('block templates', () => {
 
 describe('reflow tables', () => {
   test('carry the expected metadata', () => {
-    assert.equal(reflows.version, 1);
-    assert.deepEqual(reflows.block, [BLOCK_COLS, BLOCK_ROWS]);
-    assert.equal(reflows.expanded, EXPANDED_SIZE);
-    assert.equal(reflows.lambda, 0.35);
-    assert.equal(reflows.tables.length, TEMPLATE_COUNT);
-    for (const table of reflows.tables) assert.equal(table.length, SLOTS_PER_BLOCK);
+    assert.equal(layouts.version, 2);
+    assert.deepEqual(layouts.block, [BLOCK_COLS, BLOCK_ROWS]);
+    assert.equal(layouts.slots, SLOTS_PER_BLOCK);
+    assert.equal(layouts.expanded, EXPANDED_SIZE);
+    assert.equal(layouts.templates.length, TEMPLATE_COUNT);
+    assert.equal(layouts.reflows.length, TEMPLATE_COUNT);
+    for (const table of layouts.reflows) assert.equal(table.length, SLOTS_PER_BLOCK);
   });
 
-  test('all 240 mirrored layouts are exact covers with a 6×6 at the expanded slot', () => {
+  test(`all ${REFLOW_LAYOUTS} mirrored layouts are exact covers with a 6×6 at the expanded slot`, () => {
     let checked = 0;
     for (let t = 0; t < TEMPLATE_COUNT; t++) {
       for (let s = 0; s < SLOTS_PER_BLOCK; s++) {
@@ -219,11 +274,32 @@ describe('reflow tables', () => {
         }
       }
     }
-    assert.equal(checked, 240);
+    assert.equal(checked, REFLOW_LAYOUTS);
   });
 
-  test('blockReflows.json stays under 60 KB', () => {
-    assert.ok(statSync(reflowsPath).size < 60 * 1024);
+  test('an expanded card grows in place and keeps gutters short', () => {
+    let shift = 0;
+    for (let t = 0; t < TEMPLATE_COUNT; t++) {
+      for (let s = 0; s < SLOTS_PER_BLOCK; s++) {
+        const layout = reflowRects(t, s);
+        const card = BLOCK_TEMPLATES[t][s];
+        const grown = layout[s];
+        assert.ok(grown.col < card.col + card.w && card.col < grown.col + grown.w
+          && grown.row < card.row + card.h && card.row < grown.row + grown.h, `template ${t} slot ${s} 6×6 leaves the card`);
+        const before = centreOf(card);
+        const after = centreOf(grown);
+        const distance = Math.hypot(after.x - before.x, after.y - before.y);
+        assert.ok(distance <= REFLOW_SHIFT_LIMIT, `template ${t} slot ${s} moves ${distance.toFixed(2)} cells`);
+        shift += distance;
+        const { longest } = gutterStats(layout);
+        assert.ok(longest <= REFLOW_GUTTER_LIMIT, `template ${t} slot ${s} leaves a ${longest}-cell straight gutter`);
+      }
+    }
+    assert.ok(shift / (TEMPLATE_COUNT * SLOTS_PER_BLOCK) < 2, 'the 6×6 should usually sit on the card itself');
+  });
+
+  test('blockLayouts.json stays under 96 KB', () => {
+    assert.ok(statSync(layoutsPath).size < 96 * 1024);
   });
 });
 
@@ -238,7 +314,7 @@ describe('lattice cell', () => {
   });
 
   test('cell dimensions form a full rectangle of blocks', () => {
-    const expected = { 1: [1, 1], 5: [1, 1], 12: [1, 1], 13: [1, 2], 50: [2, 3], 500: [5, 9] };
+    const expected = { 1: [2, 2], 5: [2, 2], 12: [2, 2], 13: [2, 2], 50: [2, 2], 500: [3, 6] };
     for (const tileCount of TILE_COUNTS) {
       const lattice = createLattice(tileCount, METRICS);
       const blocksNeeded = Math.ceil(tileCount / SLOTS_PER_BLOCK);
@@ -353,7 +429,7 @@ describe('lattice cell', () => {
 
 describe('cull', () => {
   const lattice = createLattice(50, METRICS);
-  const bounds = { x: 1000, y: 800, w: 1920, h: 1080 };
+  const bounds = { x: 1700, y: 900, w: 3200, h: 2200 };
   const overscan = 500;
   const grown = grow(bounds, overscan);
   const centre = { x: (grown.x0 + grown.x1) / 2, y: (grown.y0 + grown.y1) / 2 };
@@ -384,15 +460,15 @@ describe('cull', () => {
   });
 
   test('has the expected count for a known viewport', () => {
-    // Grown bounds 500..3420 × 300..2380 px touch blocks 0..2 on both axes (1344 × 896 px per block);
-    // block (1,1) lies fully inside, so all of its 12 cards must be present.
+    // Grown bounds 1200..5400 × 400..3600 px touch blocks 0..2 on both axes (2240 × 1344 px per block);
+    // block (1,1) lies fully inside, so all of its cards must be present.
     const result = lattice.cull(bounds, overscan, null, 100_000);
     const blocks = new Set(result.map((instance) => `${instance.bc},${instance.br}`));
     assert.equal(blocks.size, 9);
     assert.equal(result.filter((instance) => instance.bc === 1 && instance.br === 1).length, SLOTS_PER_BLOCK);
     assert.ok(result.length > SLOTS_PER_BLOCK && result.length < 9 * SLOTS_PER_BLOCK);
 
-    // Bounds aligned to exactly 2 × 2 blocks with no overscan: precisely those 48 cards intersect.
+    // Bounds aligned to exactly 2 × 2 blocks with no overscan: precisely those blocks' cards intersect.
     const aligned = { x: 0, y: 0, w: 2 * BLOCK_COLS * lattice.unit, h: 2 * BLOCK_ROWS * lattice.unit };
     const exact = lattice.cull(aligned, 0, null, 100_000);
     assert.equal(exact.length, 4 * SLOTS_PER_BLOCK);
@@ -575,23 +651,24 @@ describe('expansion', () => {
 
 describe('slotToTile mapping', () => {
   test('rejects mappings that are the wrong length or drop a tile', () => {
-    const slotCount = 2 * 12;
-    assert.throws(() => createLattice(13, METRICS, [0]), RangeError);
-    assert.throws(() => createLattice(13, METRICS, Array.from({ length: slotCount }, (_, i) => i % 12)), RangeError);
+    const slotCount = createLattice(13, METRICS).blocksPerCell * SLOTS_PER_BLOCK;
+    assert.throws(() => createLattice(13, METRICS, [0]), /length/);
+    // Right length, but tile 12 never appears.
+    assert.throws(() => createLattice(13, METRICS, Array.from({ length: slotCount }, (_, i) => i % 12)), /missing tile 12/);
   });
 
   test('nearestInstance follows a custom mapping', () => {
     const tileCount = 13;
-    const slotCount = 2 * 12;
+    const slotCount = createLattice(tileCount, METRICS).blocksPerCell * SLOTS_PER_BLOCK;
     const mapping = Array.from({ length: slotCount }, (_, i) => (tileCount - 1 - (i % tileCount) + tileCount) % tileCount);
-    // Ensure every tile appears at least once (24 slots, 13 tiles).
+    // Ensure every tile appears at least once.
     const seen = new Set(mapping);
     assert.equal(seen.size, tileCount);
     const lattice = createLattice(tileCount, METRICS, mapping);
     const origin = lattice.instanceAt(0, 0, 0, null);
     assert.equal(origin.tileIndex, mapping[0]);
-    const lastSlot = lattice.instanceAt(lattice.cellCols - 1, lattice.cellRows - 1, 11, null);
-    assert.equal(lastSlot.tileIndex, mapping[23]);
+    const lastSlot = lattice.instanceAt(lattice.cellCols - 1, lattice.cellRows - 1, SLOTS_PER_BLOCK - 1, null);
+    assert.equal(lastSlot.tileIndex, mapping[slotCount - 1]);
     const point = lattice.centerOf(origin.rect);
     const nearest = lattice.nearestInstance(origin.tileIndex, point, null);
     assert.equal(nearest.tileIndex, origin.tileIndex);

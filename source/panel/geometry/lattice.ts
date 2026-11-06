@@ -19,8 +19,7 @@ import {
   type PixelRect,
   type Point,
 } from '../types.ts';
-import { BLOCK_TEMPLATES, mirrorFor, mirrorRect, templateIndexFor, type TemplateRect } from './blockTemplates.ts';
-import reflows from './blockReflows.json' with { type: 'json' };
+import { BLOCK_TEMPLATES, mirrorFor, mirrorRect, reflowRects, templateIndexFor, type TemplateRect } from './blockTemplates.ts';
 
 const MIRROR_COUNT = 4;
 const VALUES_PER_RECT = 4;
@@ -38,20 +37,6 @@ function reflowLayoutOffset(template: number, expandedSlot: number, mirror: Mirr
   return (TEMPLATE_LAYOUT_COUNT + (template * SLOTS_PER_BLOCK + expandedSlot) * MIRROR_COUNT + mirror) * LAYOUT_STRIDE;
 }
 
-function readReflowTable(template: number, slot: number): TemplateRect[] {
-  const table = reflows.tables[template]?.[slot];
-  if (table === undefined || table.length !== SLOTS_PER_BLOCK) {
-    throw new Error(`blockReflows.json has no table for template ${template} slot ${slot}`);
-  }
-  return table.map((values) => {
-    const [col, row, w, h] = values;
-    if (col === undefined || row === undefined || w === undefined || h === undefined) {
-      throw new Error(`blockReflows.json has a malformed rect in template ${template} slot ${slot}`);
-    }
-    return { col, row, w, h };
-  });
-}
-
 function writeLayout(out: Uint8Array, offset: number, rects: ReadonlyArray<TemplateRect>, mirror: Mirror): void {
   rects.forEach((rect, slot) => {
     const mirrored = mirrorRect(rect, mirror);
@@ -64,14 +49,11 @@ function writeLayout(out: Uint8Array, offset: number, rects: ReadonlyArray<Templ
 }
 
 /**
- * Every block-local layout the wall can show, flattened to `[col, row, w, h]` per slot: the 20
- * template × mirror variants first, then the 240 reflow × mirror variants. Mirroring a reflow table
+ * Every block-local layout the wall can show, flattened to `[col, row, w, h]` per slot: the
+ * template × mirror variants first, then the reflow × mirror variants. Mirroring a reflow table
  * is valid because reflection preserves both exact cover and slot order.
  */
 function buildLayouts(): Uint8Array {
-  if (reflows.block[0] !== BLOCK_COLS || reflows.block[1] !== BLOCK_ROWS || reflows.expanded !== EXPANDED_SIZE) {
-    throw new Error('blockReflows.json was generated for a different block geometry; run `npm run reflows`');
-  }
   const out = new Uint8Array((TEMPLATE_LAYOUT_COUNT + REFLOW_LAYOUT_COUNT) * LAYOUT_STRIDE);
   for (let t = 0; t < TEMPLATE_COUNT; t++) {
     const template = BLOCK_TEMPLATES[t];
@@ -80,7 +62,7 @@ function buildLayouts(): Uint8Array {
       writeLayout(out, templateLayoutOffset(t, m as Mirror), template, m as Mirror);
     }
     for (let s = 0; s < SLOTS_PER_BLOCK; s++) {
-      const table = readReflowTable(t, s);
+      const table = reflowRects(t, s);
       for (let m = 0; m < MIRROR_COUNT; m++) {
         writeLayout(out, reflowLayoutOffset(t, s, m as Mirror), table, m as Mirror);
       }
@@ -138,9 +120,11 @@ export function planLatticeSlots(tileCount: number, metrics: Metrics): LatticeSl
   }
 
   const blocksNeeded = Math.ceil(tileCount / SLOTS_PER_BLOCK);
-  // Blocks are wider than they are tall. Balance physical dimensions and avoid excess copies.
-  const cellCols = Math.max(1, Math.round(Math.sqrt(blocksNeeded * BLOCK_ROWS / BLOCK_COLS)));
-  const cellRows = Math.ceil(blocksNeeded / cellCols);
+  // Blocks are wider than they are tall. Balance physical dimensions and avoid excess copies. Neighbouring
+  // world blocks use different templates, so a cell at least 2 × 2 blocks keeps a tile's next copy a
+  // whole block away instead of possibly beside it.
+  const cellCols = Math.max(2, Math.round(Math.sqrt(blocksNeeded * BLOCK_ROWS / BLOCK_COLS)));
+  const cellRows = Math.max(2, Math.ceil(blocksNeeded / cellCols));
   const blocksPerCell = cellCols * cellRows;
   const cellSlotCount = blocksPerCell * SLOTS_PER_BLOCK;
   const gridCols = cellCols * BLOCK_COLS;
